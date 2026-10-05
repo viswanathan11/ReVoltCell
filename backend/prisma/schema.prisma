@@ -1,0 +1,108 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Cell {
+  id               String                    @id @default(uuid())
+  cellId           String                    @unique
+  manufacturer     String                    @default("Unknown")
+  model            String                    @default("18650")
+  chemistry        String                    @default("Li-ion")
+  nominalVoltage   Float
+  ratedCapacityMah Float
+  source           String                    @default("Recovered EV battery")
+  manufactureDate  String?
+  status           String                    @default("REGISTERED") // REGISTERED, TESTING, TESTED, FAILED, ARCHIVED
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+
+  tests            Test[]
+  analyses         Analysis[]
+  applications     ApplicationRecommendation[]
+  lifecycleEvents  LifecycleEvent[]
+}
+
+model Test {
+  id                   String                    @id @default(uuid())
+  testId               String                    @unique
+  cellId               String
+  cell                 Cell                      @relation(fields: [cellId], references: [cellId], onDelete: Cascade)
+  startedAt            DateTime?
+  completedAt          DateTime?
+  initialVoltage       Float?
+  finalVoltage         Float?
+  minimumVoltage       Float?
+  averageCurrent       Float?
+  maximumCurrent       Float?
+  initialTemperature   Float?
+  maximumTemperature   Float?
+  temperatureRise      Float?
+  testDurationSeconds  Int?
+  loadResistanceOhms   Float?                    @default(5.0)
+  loadPowerRatingWatts Float?                    @default(10.0)
+  status               String                    @default("PENDING") // PENDING, RUNNING, COMPLETED, STOPPED, FAILED
+  stopReason           String?                   // COMPLETED, USER_STOP, LOW_VOLTAGE, OVER_TEMPERATURE, TIMEOUT, ERROR
+  createdAt            DateTime                  @default(now())
+
+  measurements         TestMeasurement[]
+  analysis             Analysis?
+  applications         ApplicationRecommendation[]
+}
+
+model TestMeasurement {
+  id             String   @id @default(uuid())
+  testId         String
+  test           Test     @relation(fields: [testId], references: [testId], onDelete: Cascade)
+  timestamp      DateTime @default(now())
+  elapsedSeconds Int
+  voltage        Float
+  current        Float
+  temperature    Float
+  loadEnabled    Boolean  @default(true)
+
+  @@index([testId, elapsedSeconds])
+}
+
+model Analysis {
+  id              String   @id @default(uuid())
+  testId          String   @unique
+  test            Test     @relation(fields: [testId], references: [testId], onDelete: Cascade)
+  cellId          String
+  cell            Cell     @relation(fields: [cellId], references: [cellId], onDelete: Cascade)
+  score           Int      // 0 - 100 prototype score
+  electricalScore Int      // 0 - 40
+  thermalScore    Int      // 0 - 30
+  stabilityScore  Int      // 0 - 30
+  classification  String   // GOOD, FURTHER_EVALUATION, LOW_PERFORMANCE, UNSUITABLE
+  voltageSag      Float
+  temperatureRise Float
+  recommendation  String
+  createdAt       DateTime @default(now())
+}
+
+model ApplicationRecommendation {
+  id          String   @id @default(uuid())
+  cellId      String
+  cell        Cell     @relation(fields: [cellId], references: [cellId], onDelete: Cascade)
+  testId      String
+  test        Test     @relation(fields: [testId], references: [testId], onDelete: Cascade)
+  application String   // LOW_POWER_STORAGE, SOLAR_STORAGE, BACKUP_POWER, LED_LIGHTING, LOW_POWER_ELECTRONICS, OTHER
+  suitability String   // HIGH, MEDIUM, LOW, NOT_RECOMMENDED
+  reason      String
+  createdAt   DateTime @default(now())
+}
+
+model LifecycleEvent {
+  id          String   @id @default(uuid())
+  cellId      String
+  cell        Cell     @relation(fields: [cellId], references: [cellId], onDelete: Cascade)
+  event       String   // EV_BATTERY, RETIRED, RECOVERED, TESTED, SECOND_LIFE_EVALUATION, SECOND_LIFE_CANDIDATE, RECYCLE
+  timestamp   DateTime @default(now())
+  description String
+  createdAt   DateTime @default(now())
+}

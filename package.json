@@ -1,0 +1,25 @@
+{
+  "name": "revoltcell-platform",
+  "version": "1.0.0",
+  "description": "ReVoltCell — Second-Life Battery Screening & Digital Battery Passport Platform",
+  "scripts": {
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "seed": "npm --prefix backend run prisma:seed",
+    "test:backend": "npm --prefix backend test",
+    "build:backend": "npm --prefix backend run build",
+    "build:frontend": "npm --prefix frontend run build"
+  },
+  "keywords": [
+    "battery",
+    "li-ion",
+    "second-life",
+    "battery-passport",
+    "esp32",
+    "screening",
+    "react",
+    "express"
+  ],
+  "author": "ReVoltCell Team",
+  "license": "MIT"
+}

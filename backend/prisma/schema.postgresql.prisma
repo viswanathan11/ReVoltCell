@@ -1,0 +1,108 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Cell {
+  id               String                    @id @default(uuid())
+  cellId           String                    @unique
+  manufacturer     String                    @default("Unknown")
+  model            String                    @default("18650")
+  chemistry        String                    @default("Li-ion")
+  nominalVoltage   Float
+  ratedCapacityMah Float
+  source           String                    @default("Recovered EV battery")
+  manufactureDate  String?
+  status           String                    @default("REGISTERED")
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+
+  tests            Test[]
+  analyses         Analysis[]
+  applications     ApplicationRecommendation[]
+  lifecycleEvents  LifecycleEvent[]
+}
+
+model Test {
+  id                   String                    @id @default(uuid())
+  testId               String                    @unique
+  cellId               String
+  cell                 Cell                      @relation(fields: [cellId], references: [cellId], onDelete: Cascade)
+  startedAt            DateTime?
+  completedAt          DateTime?
+  initialVoltage       Float?
+  finalVoltage         Float?
+  minimumVoltage       Float?
+  averageCurrent       Float?
+  maximumCurrent       Float?
+  initialTemperature   Float?
+  maximumTemperature   Float?
+  temperatureRise      Float?
+  testDurationSeconds  Int?
+  loadResistanceOhms   Float?                    @default(5.0)
+  loadPowerRatingWatts Float?                    @default(10.0)
+  status               String                    @default("PENDING")
+  stopReason           String?
+  createdAt            DateTime                  @default(now())
+
+  measurements         TestMeasurement[]
+  analysis             Analysis?
+  applications         ApplicationRecommendation[]
+}
+
+model TestMeasurement {
+  id             String   @id @default(uuid())
+  testId         String
+  test           Test     @relation(fields: [testId], references: [testId], onDelete: Cascade)
+  timestamp      DateTime @default(now())
+  elapsedSeconds Int
+  voltage        Float
+  current        Float
+  temperature    Float
+  loadEnabled    Boolean  @default(true)
+
+  @@index([testId, elapsedSeconds])
+}
+
+model Analysis {
+  id              String   @id @default(uuid())
+  testId          String   @unique
+  test            Test     @relation(fields: [testId], references: [testId], onDelete: Cascade)
+  cellId          String
+  cell            Cell     @relation(fields: [cellId], references: [cellId], onDelete: Cascade)
+  score           Int
+  electricalScore Int
+  thermalScore    Int
+  stabilityScore  Int
+  classification  String
+  voltageSag      Float
+  temperatureRise Float
+  recommendation  String
+  createdAt       DateTime @default(now())
+}
+
+model ApplicationRecommendation {
+  id          String   @id @default(uuid())
+  cellId      String
+  cell        Cell     @relation(fields: [cellId], references: [cellId], onDelete: Cascade)
+  testId      String
+  test        Test     @relation(fields: [testId], references: [testId], onDelete: Cascade)
+  application String
+  suitability String
+  reason      String
+  createdAt   DateTime @default(now())
+}
+
+model LifecycleEvent {
+  id          String   @id @default(uuid())
+  cellId      String
+  cell        Cell     @relation(fields: [cellId], references: [cellId], onDelete: Cascade)
+  event       String
+  timestamp   DateTime @default(now())
+  description String
+  createdAt   DateTime @default(now())
+}
