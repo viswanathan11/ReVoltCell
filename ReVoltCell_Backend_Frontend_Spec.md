@@ -1,129 +1,224 @@
-# ReVoltCell — Backend & Frontend Implementation Specification
+# ReVoltCell — Final Software Auto-Completion Specification
 
-## 1. Project Goal
+## 1. Purpose
 
-ReVoltCell is a prototype platform for screening second-life suitability of Li-ion cells.
+ReVoltCell is a hardware + software prototype for screening lithium-ion cells recovered from retired EV batteries and preparing them for potential second-life use.
 
-The system has three major parts:
+The hardware team owns the ESP32/TFT/sensors/load/safety firmware. The software receives measurements from the ESP32, stores the complete test history, calculates a prototype screening score, creates a digital battery passport and QR code, recommends potential second-life applications, compares cells, and tracks lifecycle history.
 
-1. ESP32 hardware controller
-2. Backend API + database
-3. React.js frontend dashboard
+The authoritative hardware proposal defines five core features:
 
-The backend must be fully usable before the hardware is connected. Therefore, the backend must support both:
+1. Automated Cell Testing
+2. Second-Life Score
+3. Thermal Monitoring / Protection
+4. QR Digital Battery Passport
+5. Second-Life Application Matching
 
-- real ESP32 test submissions later
-- mock/manual test submissions now for frontend development
+It also defines Live Web Dashboard and ML Prediction as stretch/future features. The web dashboard should be implemented; ML must remain optional/future until enough validated data exists.
 
-The platform is a **prototype screening system**, not a certified battery safety, capacity, SOH, or BMS system.
+The hardware team's documented flow is:
+
+```text
+ESP32 test data
+    -> Wi-Fi / Serial
+    -> Backend / API
+    -> Database
+    -> Score Engine
+    -> Digital Passport / QR
+    -> Application Matching
+    -> Cell Matching
+    -> Lifecycle History
+```
+
+The prototype is NOT a certified battery-health, SOH, capacity, internal-resistance, safety, or second-life approval system.
 
 ---
 
-# 2. Recommended Technology Stack
+# 2. Technology Stack
 
 ## Backend
 
 - Node.js
 - Express.js
-- TypeScript preferred
-- PostgreSQL
+- TypeScript
 - Prisma ORM
-- Zod for request validation
+- SQLite
+- Zod
 - CORS
-- dotenv
 - Helmet
-- Morgan or Pino logging
+- dotenv
 
 ## Frontend
 
-- React.js
+- React
 - Vite
-- TypeScript preferred
+- TypeScript
 - React Router
-- Axios or fetch
-- Recharts for charts
-- QR code generation library
+- Axios
+- Recharts
+- QR-code generation library
 
 ## Development
 
-Backend:
-- `http://localhost:3000`
+- VS Code
+- Git
+- GitHub
 
-Frontend:
-- `http://localhost:5173`
-
-Later, ESP32 will access the backend through the laptop's LAN IP, NOT `localhost`.
-
-Example:
-
-```text
-ESP32
-  |
-  | Wi-Fi
-  v
-http://192.168.1.10:3000/api/...
-  |
-  v
-Node/Express Backend
-  |
-  v
-PostgreSQL
-```
-
-The backend must listen on:
-
-```text
-0.0.0.0
-```
-
-so that the ESP32 can access it over the local network.
+Use SQLite + Prisma because every team member should be able to clone and run the project without installing a database server.
 
 ---
 
-# 3. Environment Variables
+# 3. Architecture
 
-Create `.env`:
+```text
+                 ┌──────────────────────┐
+                 │        ESP32         │
+                 │ INA219 + DS18B20     │
+                 │ Test controller      │
+                 └──────────┬───────────┘
+                            │ Wi-Fi
+                            ▼
+                 ┌──────────────────────┐
+                 │ Node.js + Express API│
+                 │       :3000          │
+                 └──────────┬───────────┘
+                            │
+                         Prisma
+                            │
+                            ▼
+                       SQLite DB
+                            │
+              ┌─────────────┼─────────────┐
+              ▼             ▼             ▼
+        Score Engine   App Matching   Lifecycle
+              │             │             │
+              └─────────────┼─────────────┘
+                            ▼
+                    React Frontend
+                            │
+              ┌─────────────┼─────────────┐
+              ▼             ▼             ▼
+          Dashboard      Analysis      Passport
+                                            │
+                                            ▼
+                                            QR
+```
+
+---
+
+# 4. Environment Configuration
+
+## Backend `.env`
 
 ```env
 PORT=3000
 HOST=0.0.0.0
-
-DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/revoltcell"
-
+DATABASE_URL="file:./dev.db"
 CORS_ORIGIN="http://localhost:5173"
-
 API_BASE_URL="http://localhost:3000"
-
 PASSPORT_BASE_URL="http://localhost:5173/passport"
 ```
 
-Never hardcode database credentials.
+## Frontend `.env`
+
+```env
+VITE_API_BASE_URL=http://localhost:3000/api
+VITE_PASSPORT_BASE_URL=http://localhost:5173/passport
+```
+
+Never hardcode backend URLs inside React components.
 
 ---
 
-# 4. Core Data Model
+# 5. LAN / ESP32 Networking
 
-The system should store the following entities.
+`HOST=0.0.0.0` means the Node server listens on the laptop's available network interfaces.
 
-## 4.1 Cell
+It does NOT mean the ESP32 should request `0.0.0.0`.
 
-Represents a physical battery/cell.
+If the laptop running the backend is:
 
-Fields:
+```text
+192.168.1.20
+```
+
+the ESP32 sends:
+
+```text
+http://192.168.1.20:3000/api/...
+```
+
+If another teammate runs the backend:
+
+```text
+192.168.1.45
+```
+
+the ESP32 uses:
+
+```text
+http://192.168.1.45:3000/api/...
+```
+
+The ESP32's own IP should normally come from DHCP and does not need to be hardcoded.
+
+The ESP32 firmware should keep only the backend address configurable:
+
+```cpp
+const char* BACKEND_URL = "http://192.168.1.20:3000";
+```
+
+Later this can be changed through an ESP32 setup/configuration page.
+
+The OS firewall must allow TCP port 3000 when LAN access is required.
+
+---
+
+# 6. Database Model
+
+Relationships:
+
+```text
+Cell
+ ├── Tests
+ │    ├── Measurements
+ │    └── Analysis
+ ├── Application Recommendations
+ ├── Cell Matches
+ └── Lifecycle Events
+```
+
+A cell can have many tests.
+A test has many measurements.
+Historical measurements and lifecycle events are immutable.
+
+---
+
+# 7. Cell Model
 
 ```text
 id
-cellId
-manufacturer
-model
-chemistry
-nominalVoltage
-ratedCapacityMah
-source
-manufactureDate
+cellId                  unique
+cellType
+manufacturer            optional
+model                   optional
+chemistry               optional
+nominalVoltage          optional
+ratedCapacityMah        optional
+source                  optional
+manufactureDate         optional
+status
 createdAt
 updatedAt
-status
+```
+
+Statuses:
+
+```text
+REGISTERED
+TESTING
+TESTED
+ARCHIVED
 ```
 
 Example:
@@ -131,6 +226,7 @@ Example:
 ```json
 {
   "cellId": "EV-CELL-001",
+  "cellType": "18650",
   "manufacturer": "Unknown",
   "model": "18650",
   "chemistry": "Li-ion",
@@ -141,23 +237,9 @@ Example:
 }
 ```
 
-Possible status values:
-
-```text
-REGISTERED
-TESTING
-TESTED
-FAILED
-ARCHIVED
-```
-
 ---
 
-# 5. Test Data Model
-
-A test represents one controlled discharge/evaluation session.
-
-Fields:
+# 8. Test Model
 
 ```text
 id
@@ -178,17 +260,15 @@ maximumTemperature
 temperatureRise
 
 testDurationSeconds
-
 loadResistanceOhms
 loadPowerRatingWatts
 
 status
 stopReason
-
 createdAt
 ```
 
-Possible test status:
+Statuses:
 
 ```text
 PENDING
@@ -198,7 +278,7 @@ STOPPED
 FAILED
 ```
 
-Possible stop reasons:
+Stop reasons:
 
 ```text
 COMPLETED
@@ -211,13 +291,9 @@ ERROR
 
 ---
 
-# 6. Test Measurement Model
+# 9. Measurement Model
 
-Do NOT store only the final test result.
-
-Store periodic measurements so the frontend can draw graphs and the backend can analyze behavior.
-
-Fields:
+Store time-series measurements, not just the final result.
 
 ```text
 id
@@ -234,7 +310,6 @@ Example:
 
 ```json
 {
-  "timestamp": "2026-10-05T10:20:30Z",
   "elapsedSeconds": 30,
   "voltage": 3.91,
   "current": 0.82,
@@ -243,55 +318,74 @@ Example:
 }
 ```
 
-The ESP32 can eventually send batches of measurements.
+This powers:
+
+- Voltage vs Time
+- Current vs Time
+- Temperature vs Time
 
 ---
 
-# 7. Analysis Model
-
-Analysis is generated from test data.
-
-Fields:
+# 10. Analysis Model
 
 ```text
 id
 testId
 cellId
-
 score
 electricalScore
 thermalScore
 stabilityScore
-
 classification
-
 voltageSag
 temperatureRise
-
 recommendation
 createdAt
 ```
 
-Classification values:
+Initial prototype categories from the hardware proposal:
 
 ```text
-GOOD
-FURTHER_EVALUATION
-LOW_PERFORMANCE
-UNSUITABLE
+80–100  -> Recommended for Further Evaluation
+60–79   -> Needs Additional Testing
+<60     -> Recycling / Do Not Reuse
 ```
 
-IMPORTANT:
+These are prototype decision rules only.
 
-The score is a **prototype/demo score**, not a certified battery SOH percentage.
+Never call the result certified SOH, certified safety, or guaranteed reuse.
 
 ---
 
-# 8. Application Recommendation Model
+# 11. Derived Indicators
 
-The system should map the test result to possible second-life applications.
+The backend may calculate:
 
-Fields:
+- Voltage sag
+- Temperature rise
+- Average current
+- Maximum current
+- Minimum voltage
+- Test duration
+
+The source documents mention capacity/derived and internal-resistance/derived indicators, but also explicitly state that:
+
+- voltage alone is not capacity
+- capacity requires controlled charge/discharge measurement
+- internal resistance requires an appropriate measurement method
+
+Therefore, DO NOT invent these values.
+
+If the hardware does not provide a valid measurement:
+
+```text
+Capacity: Not measured
+Internal resistance: Not measured
+```
+
+---
+
+# 12. Application Recommendation Model
 
 ```text
 id
@@ -303,15 +397,14 @@ reason
 createdAt
 ```
 
-Example applications:
+Potential applications:
 
 ```text
+BACKUP_LIGHTING
+LOW_POWER_IOT
+SMALL_BACKUP_SYSTEM
 LOW_POWER_STORAGE
 SOLAR_STORAGE
-BACKUP_POWER
-LED_LIGHTING
-LOW_POWER_ELECTRONICS
-OTHER
 ```
 
 Suitability:
@@ -323,87 +416,62 @@ LOW
 NOT_RECOMMENDED
 ```
 
-Example:
-
-```json
-{
-  "application": "LOW_POWER_STORAGE",
-  "suitability": "HIGH",
-  "reason": "Stable voltage behavior and acceptable thermal response."
-}
-```
-
-Do not claim that the system has certified the cell for a real application.
-
-Use wording such as:
+Use wording:
 
 ```text
 Potential second-life application
+Potential pathway for further engineering evaluation
 ```
 
-rather than:
+Never say:
 
 ```text
-Approved for application
+Approved for use
+Guaranteed safe
+Guaranteed suitable
 ```
+
+Use transparent rule-based matching for the prototype.
 
 ---
 
-# 9. Cell Matching Model
+# 13. Cell Matching Model
 
-The frontend needs a Cell Matching feature.
+```text
+id
+sourceCellId
+matchedCellId
+scoreDifference
+similarityScore
+reason
+createdAt
+```
 
-The backend should provide similar tested cells.
-
-Matching can initially be based on:
+Compare:
 
 - prototype score
 - chemistry
 - nominal voltage
-- voltage sag
+- voltage behavior
+- current behavior
 - temperature rise
 - classification
 
-Example response:
+Example:
 
-```json
-{
-  "cellId": "EV-CELL-001",
-  "matches": [
-    {
-      "cellId": "EV-CELL-004",
-      "scoreDifference": 3,
-      "classification": "GOOD"
-    }
-  ]
-}
+```text
+CELL-001 = 88
+CELL-002 = 86
+CELL-003 = 87
+
+=> Potential matching group
 ```
 
-This is a similarity feature, not a guarantee that cells are electrically safe to connect in a pack.
+Matching does NOT guarantee electrical compatibility or safety for a real battery pack.
 
 ---
 
-# 10. Lifecycle Model
-
-Track the cell lifecycle:
-
-```text
-EV_BATTERY
-    ↓
-RETIRED
-    ↓
-RECOVERED
-    ↓
-TESTED
-    ↓
-SECOND_LIFE_EVALUATION
-    ↓
-SECOND_LIFE_CANDIDATE
-    ↓
-RECYCLE
-```
-
-Lifecycle event fields:
+# 14. Lifecycle Model
 
 ```text
 id
@@ -416,66 +484,36 @@ description
 Events:
 
 ```text
-EV_BATTERY
+ORIGINAL_EV
 RETIRED
 RECOVERED
-TESTED
+REVOLTCELL_TESTED
+SCORED
 SECOND_LIFE_EVALUATION
-SECOND_LIFE_CANDIDATE
+SECOND_LIFE_APPLICATION
+RETEST
 RECYCLE
 ```
 
----
-
-# 11. Digital Battery Passport
-
-Every cell should have a digital passport.
-
-Endpoint:
+Expected lifecycle:
 
 ```text
-GET /api/cells/:cellId/passport
+Original EV
+  -> Retired
+  -> Recovered
+  -> ReVoltCell Tested
+  -> Scored
+  -> Second-Life Evaluation
+  -> Second-Life Application
+  -> Re-test
+  -> Recycle
 ```
 
-Passport should contain:
-
-```text
-Battery ID
-Basic cell information
-Test history
-Latest measurements
-Latest analysis
-Prototype score
-Classification
-Potential applications
-Lifecycle history
-Created date
-Updated date
-```
-
-QR code should point to:
-
-```text
-http://localhost:5173/passport/EV-CELL-001
-```
-
-In deployment this becomes the real frontend/public URL.
-
-The QR should NOT contain the entire battery data.
-
-It should contain the passport URL.
+Lifecycle history is append-only.
 
 ---
 
-# 12. API Structure
-
-All API routes must be prefixed with:
-
-```text
-/api
-```
-
-Use consistent JSON responses.
+# 15. API Response Standard
 
 Success:
 
@@ -498,19 +536,128 @@ Error:
 }
 ```
 
+Use:
+
+```text
+200 OK
+201 Created
+400 Bad Request
+404 Not Found
+409 Conflict
+422 Unprocessable Entity
+500 Internal Server Error
+```
+
 ---
 
-# 13. Cell APIs
+# 16. Complete REST API
 
-## POST /api/cells
+## System
 
-Register a cell.
+```text
+GET /api/health
+```
+
+## Cells
+
+```text
+POST   /api/cells
+GET    /api/cells
+GET    /api/cells/:cellId
+PATCH  /api/cells/:cellId
+DELETE /api/cells/:cellId
+```
+
+## Tests
+
+```text
+POST /api/tests
+POST /api/tests/:testId/start
+POST /api/tests/:testId/measurements
+POST /api/tests/:testId/measurements/batch
+POST /api/tests/:testId/complete
+POST /api/tests/:testId/stop
+GET  /api/tests/:testId
+GET  /api/cells/:cellId/tests
+```
+
+## Analysis
+
+```text
+POST /api/analysis/:testId/generate
+GET  /api/tests/:testId/analysis
+GET  /api/cells/:cellId/analysis
+```
+
+## Applications
+
+```text
+GET /api/cells/:cellId/applications
+```
+
+## Matching
+
+```text
+GET /api/cells/:cellId/matches
+```
+
+## Lifecycle
+
+```text
+GET  /api/cells/:cellId/lifecycle
+POST /api/cells/:cellId/lifecycle
+```
+
+## Passport / QR
+
+```text
+GET /api/cells/:cellId/passport
+GET /api/cells/:cellId/qr
+```
+
+## Dashboard
+
+```text
+GET /api/dashboard/summary
+GET /api/dashboard/recent-tests
+GET /api/dashboard/score-distribution
+```
+
+## Mock Hardware
+
+```text
+POST /api/mock/tests/:testId/simulate
+```
+
+## Future ESP32
+
+```text
+POST /api/device/test-data
+```
+
+---
+
+# 17. API Contracts
+
+## GET `/api/health`
+
+```json
+{
+  "success": true,
+  "status": "OK",
+  "service": "ReVoltCell Backend",
+  "database": "CONNECTED"
+}
+```
+
+## POST `/api/cells`
 
 Request:
 
 ```json
 {
   "cellId": "EV-CELL-001",
+  "cellType": "18650",
   "manufacturer": "Unknown",
   "model": "18650",
   "chemistry": "Li-ion",
@@ -520,98 +667,51 @@ Request:
 }
 ```
 
-Response:
+Return `201`.
 
-```json
-{
-  "success": true,
-  "data": {
-    "cellId": "EV-CELL-001",
-    "status": "REGISTERED"
-  }
-}
-```
+## GET `/api/cells`
 
-Validation:
-
-- cellId required
-- cellId unique
-- nominalVoltage > 0
-- ratedCapacityMah >= 0
-
----
-
-## GET /api/cells
-
-Return all cells.
-
-Support:
+Query:
 
 ```text
-?page=1
-&limit=20
-&status=TESTED
-&search=EV-CELL
+?page=1&limit=20&status=TESTED&search=EV-CELL
 ```
 
-Response:
+Return paginated results.
 
-```json
-{
-  "success": true,
-  "data": [],
-  "pagination": {
-    "page": 1,
-    "limit": 20,
-    "total": 1,
-    "totalPages": 1
-  }
-}
+## GET `/api/cells/:cellId`
+
+Return:
+
+```text
+cell metadata
+current status
+latest test
+latest analysis
+latest score
 ```
 
----
+## PATCH `/api/cells/:cellId`
 
-## GET /api/cells/:cellId
+Update editable metadata only.
 
-Return complete cell summary.
+Never edit historical measurements here.
 
-Include:
+## DELETE `/api/cells/:cellId`
 
-- cell information
-- current status
-- latest test
-- latest analysis
-- latest score
-
----
-
-## PATCH /api/cells/:cellId
-
-Update editable metadata.
-
-Do not allow changing historical test measurements through this endpoint.
-
----
-
-## DELETE /api/cells/:cellId
-
-Prefer soft deletion/archive.
-
-Do not physically delete a cell that has test history.
-
-Set:
+Soft archive the cell:
 
 ```text
 status = ARCHIVED
 ```
 
+Do not physically delete a cell with test history.
+
 ---
 
-# 14. Test APIs
+# 18. Test APIs
 
-## POST /api/tests
-
-Create a test.
+## POST `/api/tests`
 
 Request:
 
@@ -635,24 +735,17 @@ Response:
 }
 ```
 
----
+## POST `/api/tests/:testId/start`
 
-## POST /api/tests/:testId/start
+Transition:
 
-Mark test as running.
+```text
+PENDING -> RUNNING
+```
 
-Used by:
+Set `startedAt`.
 
-- frontend mock mode
-- future hardware workflow if needed
-
----
-
-## POST /api/tests/:testId/measurements
-
-Upload one measurement.
-
-Request:
+## POST `/api/tests/:testId/measurements`
 
 ```json
 {
@@ -664,13 +757,9 @@ Request:
 }
 ```
 
----
+## POST `/api/tests/:testId/measurements/batch`
 
-## POST /api/tests/:testId/measurements/batch
-
-Preferred endpoint for ESP32.
-
-Request:
+Preferred ESP32 upload endpoint.
 
 ```json
 {
@@ -693,13 +782,7 @@ Request:
 }
 ```
 
-This allows ESP32 to buffer measurements and upload them in batches.
-
----
-
-## POST /api/tests/:testId/complete
-
-Complete the test.
+## POST `/api/tests/:testId/complete`
 
 Request:
 
@@ -716,38 +799,20 @@ Request:
 }
 ```
 
-Backend should:
+Backend transaction:
 
-1. Validate test
-2. Calculate derived values
-3. Mark test completed
-4. Generate analysis
-5. Generate application recommendations
-6. Update cell status to TESTED
-7. Add lifecycle event
-8. Return complete result
-
-Response:
-
-```json
-{
-  "success": true,
-  "data": {
-    "testId": "TEST-0001",
-    "status": "COMPLETED",
-    "score": 84,
-    "classification": "FURTHER_EVALUATION"
-  }
-}
+```text
+Validate
+ -> calculate derived values
+ -> mark completed
+ -> generate analysis
+ -> generate applications
+ -> update cell status
+ -> add lifecycle event
+ -> return complete result
 ```
 
----
-
-## POST /api/tests/:testId/stop
-
-Stop a running test.
-
-Request:
+## POST `/api/tests/:testId/stop`
 
 ```json
 {
@@ -755,161 +820,41 @@ Request:
 }
 ```
 
----
+## GET `/api/tests/:testId`
 
-## GET /api/tests/:testId
+Return test metadata, measurements, analysis, status and timestamps.
 
-Return complete test.
+## GET `/api/cells/:cellId/tests`
 
-Include:
-
-- test metadata
-- measurements
-- analysis
-- status
-- timestamps
+Return complete test history with pagination.
 
 ---
 
-## GET /api/cells/:cellId/tests
+# 19. Analysis APIs
 
-Return all tests for a cell.
+## POST `/api/analysis/:testId/generate`
 
-Support:
+Generate/recalculate analysis from stored test data.
+
+Put scoring logic in:
 
 ```text
-?page=1
-&limit=20
+src/services/scoreService.ts
 ```
+
+## GET `/api/tests/:testId/analysis`
+
+Return analysis for a test.
+
+## GET `/api/cells/:cellId/analysis`
+
+Return latest analysis for a cell.
 
 ---
 
-# 15. ESP32 Hardware API
+# 20. Application API
 
-The ESP32 should NOT need to know about the database schema.
-
-The hardware workflow should be:
-
-```text
-ESP32
-  ↓
-POST /api/device/tests
-  ↓
-Backend
-  ↓
-Create/store test
-  ↓
-Analysis
-```
-
-However, for the MVP, use the normal test endpoints first.
-
-Recommended future hardware endpoint:
-
-```text
-POST /api/device/test-data
-```
-
-Request:
-
-```json
-{
-  "deviceId": "REVOLTCELL-ESP32-001",
-  "cellId": "EV-CELL-001",
-  "testId": "TEST-0001",
-  "elapsedSeconds": 120,
-  "voltage": 3.91,
-  "current": 0.82,
-  "temperature": 31.4,
-  "loadEnabled": true
-}
-```
-
-This endpoint should be optional until the hardware firmware is ready.
-
-Do not build hardware authentication complexity for the initial hackathon prototype unless needed.
-
----
-
-# 16. Analysis APIs
-
-## POST /api/analysis/:testId/generate
-
-Generate/recalculate analysis for a completed test.
-
-This is useful during development.
-
----
-
-## GET /api/cells/:cellId/analysis
-
-Return latest analysis.
-
----
-
-## GET /api/tests/:testId/analysis
-
-Return analysis for a specific test.
-
----
-
-# 17. Analysis Logic
-
-Implement analysis as a separate backend service:
-
-```text
-services/
-  analysisService.ts
-```
-
-Input:
-
-```text
-test
-measurements
-cell metadata
-```
-
-Output:
-
-```text
-score
-electricalScore
-thermalScore
-stabilityScore
-classification
-recommendation
-```
-
-Example prototype scoring:
-
-```text
-Electrical performance: 0–40
-Thermal behavior:       0–30
-Stability:              0–30
-
-Total:                  0–100
-```
-
-Clearly label the score:
-
-```text
-Prototype Second-Life Screening Score
-```
-
-Do not call it:
-
-```text
-Certified SOH
-```
-
----
-
-# 18. Application Matching API
-
-## GET /api/cells/:cellId/applications
-
-Return possible applications.
+## GET `/api/cells/:cellId/applications`
 
 Example:
 
@@ -918,13 +863,15 @@ Example:
   "success": true,
   "data": {
     "primary": {
-      "application": "LOW_POWER_STORAGE",
-      "suitability": "HIGH"
+      "application": "BACKUP_LIGHTING",
+      "suitability": "HIGH",
+      "reason": "Prototype test characteristics support further evaluation for this low-demand pathway."
     },
     "alternatives": [
       {
-        "application": "BACKUP_POWER",
-        "suitability": "MEDIUM"
+        "application": "LOW_POWER_IOT",
+        "suitability": "MEDIUM",
+        "reason": "Potential low-demand pathway requiring engineering validation."
       }
     ]
   }
@@ -933,11 +880,9 @@ Example:
 
 ---
 
-# 19. Cell Matching API
+# 21. Matching API
 
-## GET /api/cells/:cellId/matches
-
-Return similar cells.
+## GET `/api/cells/:cellId/matches`
 
 Query:
 
@@ -945,23 +890,31 @@ Query:
 ?limit=5
 ```
 
-Match based on stored test/analysis characteristics.
+Example:
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "cellId": "EV-CELL-004",
+      "similarityScore": 94,
+      "scoreDifference": 3,
+      "classification": "RECOMMENDED_FOR_FURTHER_EVALUATION"
+    }
+  ]
+}
+```
 
 ---
 
-# 20. Lifecycle APIs
+# 22. Lifecycle APIs
 
-## GET /api/cells/:cellId/lifecycle
+## GET `/api/cells/:cellId/lifecycle`
 
-Return lifecycle history.
+Return chronological lifecycle history.
 
----
-
-## POST /api/cells/:cellId/lifecycle
-
-Add lifecycle event.
-
-Request:
+## POST `/api/cells/:cellId/lifecycle`
 
 ```json
 {
@@ -970,41 +923,86 @@ Request:
 }
 ```
 
----
-
-# 21. Passport API
-
-## GET /api/cells/:cellId/passport
-
-Return all information needed by the passport page.
-
-This should be the primary endpoint used by:
+Automatically create:
 
 ```text
-React /passport/:cellId
+REVOLTCELL_TESTED
+SCORED
 ```
 
-Response should combine:
-
-```text
-cell
-latestTest
-latestAnalysis
-applications
-matches
-lifecycle
-testHistory
-```
-
-Do not make the frontend call 7 endpoints just to render the passport.
+when the relevant workflow completes.
 
 ---
 
-# 22. Dashboard APIs
+# 23. Passport API
 
-## GET /api/dashboard/summary
+## GET `/api/cells/:cellId/passport`
+
+This is the main endpoint for the React passport page.
 
 Return:
+
+```json
+{
+  "success": true,
+  "data": {
+    "cell": {},
+    "latestTest": {},
+    "latestAnalysis": {},
+    "applications": [],
+    "matches": [],
+    "lifecycle": [],
+    "testHistory": []
+  }
+}
+```
+
+The frontend should not need multiple separate requests just to render the passport.
+
+Passport fields:
+
+```text
+Battery ID
+Cell type
+Chemistry
+Manufacturer/model when available
+Source
+Test date
+Measured values
+Test conditions
+Derived indicators
+Prototype score
+Screening category
+Potential applications
+Lifecycle history
+Test history
+```
+
+---
+
+# 24. QR API
+
+## GET `/api/cells/:cellId/qr`
+
+QR target:
+
+```text
+http://localhost:5173/passport/EV-CELL-001
+```
+
+Use `PASSPORT_BASE_URL`.
+
+The QR should contain only the passport URL.
+
+In deployment, change the base URL through environment configuration.
+
+---
+
+# 25. Dashboard APIs
+
+## GET `/api/dashboard/summary`
+
+Example:
 
 ```json
 {
@@ -1013,418 +1011,32 @@ Return:
     "totalCells": 24,
     "testedCells": 18,
     "testingCells": 2,
-    "goodCells": 8,
-    "furtherEvaluation": 6,
-    "lowPerformance": 4,
-    "unsuitable": 0
+    "recommendedForFurtherEvaluation": 8,
+    "needsAdditionalTesting": 6,
+    "recyclingDoNotReuse": 4
   }
 }
 ```
 
----
+## GET `/api/dashboard/recent-tests`
 
-## GET /api/dashboard/recent-tests
-
-Return recent tests.
-
-Support:
+Query:
 
 ```text
 ?limit=10
 ```
 
----
+## GET `/api/dashboard/score-distribution`
 
-## GET /api/dashboard/score-distribution
-
-Return score distribution for charts.
+Return chart-friendly score buckets.
 
 ---
 
-# 23. Health API
+# 26. Mock Hardware — REQUIRED
 
-## GET /api/health
+The software must work before physical hardware exists.
 
-Response:
-
-```json
-{
-  "success": true,
-  "status": "OK",
-  "service": "ReVoltCell Backend",
-  "database": "CONNECTED"
-}
-```
-
-This is required for frontend/backend connection testing.
-
----
-
-# 24. Frontend Pages
-
-React application should contain:
-
-```text
-/
-  Dashboard
-
-/cells
-  Cell list
-
-/cells/:cellId
-  Cell details
-
-/cells/:cellId/tests
-  Test history
-
-/test/new
-  Create test
-
-/test/:testId
-  Live/replay test dashboard
-
-/analysis/:cellId
-  Battery analysis
-
-/applications/:cellId
-  Application matching
-
-/matching/:cellId
-  Cell matching
-
-/lifecycle/:cellId
-  Lifecycle tracking
-
-/passport/:cellId
-  Digital battery passport
-```
-
----
-
-# 25. Dashboard
-
-Display:
-
-```text
-Total Cells
-Tested
-Currently Testing
-Good
-Further Evaluation
-Low Performance
-```
-
-Charts:
-
-- score distribution
-- recent test scores
-- voltage vs time
-- temperature vs time
-
----
-
-# 26. Live Test Screen
-
-The frontend must support mock/live modes.
-
-Display:
-
-```text
-CELL ID
-Voltage
-Current
-Temperature
-Elapsed time
-Load status
-Test status
-```
-
-Graphs:
-
-```text
-Voltage vs Time
-Current vs Time
-Temperature vs Time
-```
-
-Buttons:
-
-```text
-Start
-Stop
-Complete
-```
-
-For now, generate mock measurements.
-
-Later replace mock source with ESP32 data.
-
----
-
-# 27. Battery Analysis Screen
-
-Display:
-
-```text
-Prototype Score
-Electrical
-Thermal
-Stability
-Classification
-Recommendation
-```
-
-Example:
-
-```text
-84 / 100
-
-Electrical       GOOD
-Thermal          GOOD
-Stability        GOOD
-
-FURTHER EVALUATION
-```
-
----
-
-# 28. Application Matching Screen
-
-Display:
-
-```text
-Primary potential application
-Suitability
-Reason
-
-Alternative applications
-```
-
-Use cautious wording:
-
-```text
-Potential second-life use
-```
-
----
-
-# 29. Cell Matching Screen
-
-Display:
-
-```text
-Current Cell
-Score
-
-Similar Cells
-Score difference
-Classification
-```
-
-Include warning:
-
-```text
-Similarity does not guarantee pack compatibility or safety.
-```
-
----
-
-# 30. Lifecycle Screen
-
-Use a timeline:
-
-```text
-EV Battery
-    ↓
-Retired
-    ↓
-Recovered
-    ↓
-Tested
-    ↓
-Second-Life Evaluation
-    ↓
-Candidate
-```
-
----
-
-# 31. Digital Passport Screen
-
-Display:
-
-```text
-REVOLTCELL DIGITAL BATTERY PASSPORT
-
-Cell ID
-Chemistry
-Model
-Source
-
-Prototype Score
-Classification
-
-Latest Test
-Voltage
-Current
-Temperature
-
-Potential Applications
-
-Lifecycle
-
-QR CODE
-```
-
-QR should point to:
-
-```text
-/passport/:cellId
-```
-
----
-
-# 32. Frontend API Client
-
-Create:
-
-```text
-src/api/
-  client.ts
-  cellsApi.ts
-  testsApi.ts
-  analysisApi.ts
-  dashboardApi.ts
-  passportApi.ts
-```
-
-Use a central API client.
-
-Example:
-
-```ts
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
-```
-
-Do not hardcode API URLs throughout components.
-
----
-
-# 33. Backend Folder Structure
-
-Recommended:
-
-```text
-backend/
-├── src/
-│   ├── config/
-│   │   └── env.ts
-│   │
-│   ├── controllers/
-│   │   ├── cellController.ts
-│   │   ├── testController.ts
-│   │   ├── analysisController.ts
-│   │   ├── applicationController.ts
-│   │   ├── lifecycleController.ts
-│   │   ├── dashboardController.ts
-│   │   └── passportController.ts
-│   │
-│   ├── routes/
-│   │   ├── cellRoutes.ts
-│   │   ├── testRoutes.ts
-│   │   ├── analysisRoutes.ts
-│   │   ├── dashboardRoutes.ts
-│   │   └── passportRoutes.ts
-│   │
-│   ├── services/
-│   │   ├── analysisService.ts
-│   │   ├── applicationService.ts
-│   │   ├── matchingService.ts
-│   │   ├── lifecycleService.ts
-│   │   └── passportService.ts
-│   │
-│   ├── middleware/
-│   │   ├── errorHandler.ts
-│   │   └── validation.ts
-│   │
-│   ├── validators/
-│   │   ├── cellValidator.ts
-│   │   └── testValidator.ts
-│   │
-│   ├── app.ts
-│   └── server.ts
-│
-├── prisma/
-│   └── schema.prisma
-│
-├── .env
-├── package.json
-└── tsconfig.json
-```
-
----
-
-# 34. Frontend Folder Structure
-
-```text
-frontend/
-├── src/
-│   ├── api/
-│   │   ├── client.ts
-│   │   ├── cellsApi.ts
-│   │   ├── testsApi.ts
-│   │   ├── analysisApi.ts
-│   │   ├── dashboardApi.ts
-│   │   └── passportApi.ts
-│   │
-│   ├── components/
-│   │   ├── Navbar.tsx
-│   │   ├── StatCard.tsx
-│   │   ├── CellStatusBadge.tsx
-│   │   ├── ScoreGauge.tsx
-│   │   ├── TestChart.tsx
-│   │   ├── LifecycleTimeline.tsx
-│   │   └── QRCode.tsx
-│   │
-│   ├── pages/
-│   │   ├── Dashboard.tsx
-│   │   ├── Cells.tsx
-│   │   ├── CellDetails.tsx
-│   │   ├── NewTest.tsx
-│   │   ├── TestDetails.tsx
-│   │   ├── Analysis.tsx
-│   │   ├── Applications.tsx
-│   │   ├── Matching.tsx
-│   │   ├── Lifecycle.tsx
-│   │   └── Passport.tsx
-│   │
-│   ├── types/
-│   │   ├── cell.ts
-│   │   ├── test.ts
-│   │   └── analysis.ts
-│   │
-│   ├── App.tsx
-│   └── main.tsx
-│
-├── .env
-├── package.json
-└── vite.config.ts
-```
-
----
-
-# 35. Mock Hardware Mode
-
-This is REQUIRED.
-
-Before real hardware exists, frontend must work with simulated test data.
-
-Create:
-
-```text
-POST /api/mock/tests/:testId/simulate
-```
+## POST `/api/mock/tests/:testId/simulate`
 
 Request:
 
@@ -1443,504 +1055,1123 @@ HOT
 UNSTABLE
 ```
 
-The backend can generate realistic-looking measurement sequences for development.
+The mock generator must produce time-series measurements and send them through the SAME storage and analysis services used by real ESP32 data.
 
-The frontend should also have a:
+Frontend must include:
 
 ```text
-Mock Hardware
+Mock Hardware Mode
 ```
 
-toggle.
+Demo flow:
 
-This allows the entire project to be demonstrated without the ESP32.
+```text
+Register Cell
+ -> Create Test
+ -> Simulate Test
+ -> Measurements
+ -> Complete
+ -> Score
+ -> Applications
+ -> Lifecycle
+ -> Passport
+ -> QR
+```
 
-Do NOT intentionally damage real cells to create a bad-cell demonstration.
+Do not intentionally damage real cells to demonstrate bad behavior.
 
 ---
 
-# 36. Seed Data
+# 27. ESP32 Integration Contract
 
-Create database seed data with at least:
-
-```text
-10 cells
-```
-
-Include examples of:
+The current hardware architecture uses:
 
 ```text
-GOOD
-FURTHER_EVALUATION
-LOW_PERFORMANCE
+INA219 -> voltage/current measurement
+DS18B20 -> cell surface temperature
+ESP32 -> controller
+IRLZ44N -> electronic load switching
+Arduino UNO + TFT -> display
 ```
 
-Each should have:
+Current planned ESP32 pins:
 
-- cell information
-- at least one completed test
-- measurements
-- analysis
-- application recommendation
-- lifecycle history
+```text
+GPIO4  = DS18B20 DATA
+GPIO21 = INA219 SDA
+GPIO22 = INA219 SCL
+GPIO23 = MOSFET Gate
+GPIO18 = START
+GPIO19 = STOP
+GPIO25 = BLUE LED
+GPIO26 = GREEN LED
+GPIO27 = RED LED
+GPIO17 = UART TX -> UNO A5 RX
+```
 
-This makes the frontend immediately useful after setup.
+The backend must NOT depend on GPIO numbers.
+
+The ESP32 firmware converts hardware data into:
+
+```json
+{
+  "cellId": "EV-CELL-001",
+  "testId": "TEST-0001",
+  "elapsedSeconds": 120,
+  "voltage": 3.91,
+  "current": 0.82,
+  "temperature": 31.4,
+  "loadEnabled": true
+}
+```
+
+## Future endpoint
+
+`POST /api/device/test-data`
+
+```json
+{
+  "deviceId": "REVOLTCELL-ESP32-001",
+  "cellId": "EV-CELL-001",
+  "testId": "TEST-0001",
+  "elapsedSeconds": 120,
+  "voltage": 3.91,
+  "current": 0.82,
+  "temperature": 31.4,
+  "loadEnabled": true
+}
+```
+
+This endpoint must reuse the same internal measurement service as:
+
+```text
+POST /api/tests/:testId/measurements
+```
+
+Do not duplicate measurement-storage logic.
 
 ---
 
-# 37. CORS
-
-During development allow:
+# 28. React Routes
 
 ```text
-http://localhost:5173
+/
+/dashboard
+
+/cells
+/cells/:cellId
+/cells/:cellId/tests
+
+/test/new
+/test/:testId
+
+/analysis/:cellId
+/applications/:cellId
+/matching/:cellId
+/lifecycle/:cellId
+
+/passport/:cellId
 ```
-
-Later allow the deployed frontend domain.
-
-Do not use unrestricted CORS in production.
 
 ---
 
-# 38. Validation
+# 29. React Pages
 
-Every POST/PATCH endpoint must validate input.
+## Dashboard
+
+Show:
+
+```text
+Total Cells
+Tested
+Testing
+Recommended for Further Evaluation
+Needs Additional Testing
+Recycling / Do Not Reuse
+```
+
+Charts:
+
+```text
+Score distribution
+Recent scores
+Voltage vs time
+Current vs time
+Temperature vs time
+```
+
+## Cells
+
+Show:
+
+```text
+Battery ID
+Cell Type
+Status
+Latest Score
+Latest Test
+Classification
+```
+
+Support search, filters and pagination.
+
+## Cell Details
+
+Show:
+
+```text
+Metadata
+Current status
+Latest score
+Latest test
+Applications
+Lifecycle
+Test history
+```
+
+Actions:
+
+```text
+Start Test
+Analysis
+Passport
+QR
+```
+
+## New Test
+
+```text
+Select/register cell
+ -> create test
+ -> start
+```
+
+Must work in mock mode.
+
+## Test Details
+
+Show:
+
+```text
+Voltage
+Current
+Temperature
+Elapsed time
+Load status
+Test status
+```
+
+Graphs:
+
+```text
+Voltage vs Time
+Current vs Time
+Temperature vs Time
+```
+
+## Analysis
+
+Show:
+
+```text
+Prototype Second-Life Score
+Electrical Score
+Thermal Score
+Stability Score
+Classification
+Recommendation
+```
+
+## Applications
+
+Show:
+
+```text
+Primary potential application
+Suitability
+Reason
+Alternative applications
+```
+
+## Matching
+
+Show:
+
+```text
+Current cell
+Score
+Similar cells
+Similarity
+Score difference
+Classification
+Reason
+```
+
+Include:
+
+```text
+Similarity does not guarantee pack compatibility or safety.
+```
+
+## Lifecycle
+
+Timeline:
+
+```text
+Original EV
+ -> Retired
+ -> Recovered
+ -> ReVoltCell Tested
+ -> Scored
+ -> Second-Life Evaluation
+ -> Second-Life Application
+ -> Re-test
+ -> Recycle
+```
+
+## Passport
+
+Show:
+
+```text
+REVOLTCELL DIGITAL BATTERY PASSPORT
+Battery ID
+Cell metadata
+Test data
+Test conditions
+Prototype score
+Screening category
+Potential applications
+Lifecycle
+Test history
+QR
+```
+
+---
+
+# 30. Frontend API Client
+
+Create:
+
+```text
+src/api/client.ts
+src/api/cellsApi.ts
+src/api/testsApi.ts
+src/api/analysisApi.ts
+src/api/applicationsApi.ts
+src/api/matchingApi.ts
+src/api/lifecycleApi.ts
+src/api/passportApi.ts
+src/api/dashboardApi.ts
+```
+
+Central client:
+
+```ts
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:3000/api";
+```
+
+Do not hardcode API URLs in components.
+
+---
+
+# 31. Backend Folder Structure
+
+```text
+backend/
+├── prisma/
+│   ├── schema.prisma
+│   └── seed.ts
+├── src/
+│   ├── config/
+│   │   └── env.ts
+│   ├── controllers/
+│   │   ├── cellController.ts
+│   │   ├── testController.ts
+│   │   ├── analysisController.ts
+│   │   ├── applicationController.ts
+│   │   ├── matchingController.ts
+│   │   ├── lifecycleController.ts
+│   │   ├── passportController.ts
+│   │   ├── dashboardController.ts
+│   │   └── mockController.ts
+│   ├── routes/
+│   ├── services/
+│   │   ├── scoreService.ts
+│   │   ├── applicationMatchingService.ts
+│   │   ├── cellMatchingService.ts
+│   │   ├── lifecycleService.ts
+│   │   ├── passportService.ts
+│   │   └── mockHardwareService.ts
+│   ├── validators/
+│   ├── middleware/
+│   ├── utils/
+│   ├── app.ts
+│   └── server.ts
+├── tests/
+├── .env
+├── package.json
+├── tsconfig.json
+└── README.md
+```
+
+---
+
+# 32. Frontend Folder Structure
+
+```text
+frontend/
+├── src/
+│   ├── api/
+│   ├── components/
+│   │   ├── Navbar.tsx
+│   │   ├── Sidebar.tsx
+│   │   ├── StatCard.tsx
+│   │   ├── CellStatusBadge.tsx
+│   │   ├── ScoreGauge.tsx
+│   │   ├── MeasurementChart.tsx
+│   │   ├── LifecycleTimeline.tsx
+│   │   ├── ApplicationCard.tsx
+│   │   ├── CellMatchTable.tsx
+│   │   └── QRCodeDisplay.tsx
+│   ├── pages/
+│   ├── hooks/
+│   ├── types/
+│   ├── App.tsx
+│   └── main.tsx
+├── .env
+├── package.json
+└── vite.config.ts
+```
+
+---
+
+# 33. Validation
+
+Use Zod for all incoming API bodies.
 
 Reject:
 
 ```text
 missing cellId
+missing testId
 negative voltage
 negative current
 invalid temperature
-invalid test status
-invalid enum values
+invalid enum
+invalid state transition
 duplicate cellId
-```
-
-Return HTTP status codes appropriately:
-
-```text
-200 OK
-201 Created
-400 Bad Request
-404 Not Found
-409 Conflict
-422 Validation Error
-500 Internal Server Error
+invalid measurement array
 ```
 
 ---
 
-# 39. Error Handling
+# 34. Error Handling
 
-Use one centralized error middleware.
+Use centralized Express error middleware.
 
-All errors should follow:
+Never expose stack traces.
+
+All errors:
 
 ```json
 {
   "success": false,
   "error": {
     "code": "ERROR_CODE",
-    "message": "Human readable message"
+    "message": "Human-readable message"
   }
 }
 ```
 
-Do not expose stack traces to the frontend.
+---
+
+# 35. CORS
+
+Development:
+
+```text
+http://localhost:5173
+```
+
+Use:
+
+```env
+CORS_ORIGIN=http://localhost:5173
+```
+
+CORS is a browser policy; it does not replace firewall/network configuration for ESP32.
+
+Do not use unrestricted CORS in production.
 
 ---
 
-# 40. Database Rules
+# 36. Seed Data
 
-Important relationships:
+Create at least 10 demo cells:
+
+```text
+EV-CELL-001
+EV-CELL-002
+EV-CELL-003
+EV-CELL-004
+EV-CELL-005
+EV-CELL-006
+EV-CELL-007
+EV-CELL-008
+EV-CELL-009
+EV-CELL-010
+```
+
+Include multiple prototype categories:
+
+```text
+Recommended for Further Evaluation
+Needs Additional Testing
+Recycling / Do Not Reuse
+```
+
+Every seeded tested cell should have:
+
+```text
+cell metadata
+test
+measurements
+analysis
+application recommendation
+lifecycle history
+```
+
+Seed data must be clearly treated as demo/simulated data.
+
+---
+
+# 37. Test State Machine
+
+Valid:
+
+```text
+PENDING
+   ↓
+RUNNING
+   ├── COMPLETED
+   ├── STOPPED
+   └── FAILED
+```
+
+Do not allow invalid transitions such as:
+
+```text
+COMPLETED -> RUNNING
+COMPLETED -> PENDING
+FAILED -> RUNNING
+```
+
+A new physical evaluation should create a new test.
+
+---
+
+# 38. Data Integrity Rules
+
+1. Cell IDs are unique.
+2. A cell can have many tests.
+3. A test belongs to one cell.
+4. Measurements belong to one test.
+5. Historical measurements are immutable.
+6. Completed tests are not silently edited.
+7. Analysis must be reproducible from stored data.
+8. Lifecycle history is append-only.
+9. Passport is generated from database data.
+10. QR references the passport URL.
+11. No fake capacity/internal-resistance values.
+12. No fake safety certification.
+
+---
+
+# 39. Score Service
+
+Create:
+
+```text
+src/services/scoreService.ts
+```
+
+Input:
 
 ```text
 Cell
- ├── Tests
- │    ├── Measurements
- │    └── Analysis
- │
- ├── Applications
- ├── Lifecycle Events
- └── Matching
+Test
+Measurements
 ```
 
-A cell can have many tests.
+Output:
 
-A test can have many measurements.
+```text
+score
+electricalScore
+thermalScore
+stabilityScore
+classification
+recommendation
+```
 
-A test has at most one current analysis result.
+Initial conceptual weighting may be:
 
-Historical measurements must never be overwritten.
+```text
+Electrical performance: 0–40
+Thermal behavior:       0–30
+Stability:              0–30
+Total:                  0–100
+```
+
+Keep all thresholds in one place so the scoring model can be changed without rewriting controllers or React.
 
 ---
 
-# 41. API Summary
+# 40. Application Matching Service
 
-Minimum required endpoints:
+Create:
 
 ```text
-GET    /api/health
+src/services/applicationMatchingService.ts
+```
 
-POST   /api/cells
-GET    /api/cells
-GET    /api/cells/:cellId
-PATCH  /api/cells/:cellId
-DELETE /api/cells/:cellId
+Use transparent rules.
 
-POST   /api/tests
-POST   /api/tests/:testId/start
-POST   /api/tests/:testId/measurements
-POST   /api/tests/:testId/measurements/batch
-POST   /api/tests/:testId/complete
-POST   /api/tests/:testId/stop
-GET    /api/tests/:testId
-GET    /api/cells/:cellId/tests
+Conceptually:
 
-POST   /api/analysis/:testId/generate
-GET    /api/cells/:cellId/analysis
-GET    /api/tests/:testId/analysis
+```text
+High score
++ stable electrical behavior
++ acceptable thermal behavior
+    -> potential low-demand application
 
-GET    /api/cells/:cellId/applications
+Moderate score
+    -> additional testing
 
-GET    /api/cells/:cellId/matches
+Low score
+    -> recycling / do-not-reuse pathway
+```
 
-GET    /api/cells/:cellId/lifecycle
-POST   /api/cells/:cellId/lifecycle
+Return reasons with recommendations.
 
-GET    /api/cells/:cellId/passport
+---
 
-GET    /api/dashboard/summary
-GET    /api/dashboard/recent-tests
-GET    /api/dashboard/score-distribution
+# 41. Cell Matching Service
 
-POST   /api/mock/tests/:testId/simulate
+Create:
+
+```text
+src/services/cellMatchingService.ts
+```
+
+Return:
+
+```text
+matched cell
+similarity score
+score difference
+reason
+```
+
+Do not imply guaranteed pack compatibility.
+
+---
+
+# 42. Lifecycle Service
+
+Create:
+
+```text
+src/services/lifecycleService.ts
+```
+
+Use append-only lifecycle events.
+
+Automatically add:
+
+```text
+REVOLTCELL_TESTED
+SCORED
+```
+
+when appropriate.
+
+---
+
+# 43. Passport Service
+
+Create:
+
+```text
+src/services/passportService.ts
+```
+
+Combine:
+
+```text
+cell
+latest test
+latest analysis
+applications
+matches
+lifecycle
+test history
+```
+
+Passport endpoint should be the single read endpoint for the passport page.
+
+---
+
+# 44. Mock Hardware Service
+
+Create:
+
+```text
+src/services/mockHardwareService.ts
+```
+
+Profiles:
+
+```text
+GOOD
+WEAK
+HOT
+UNSTABLE
+```
+
+Generate realistic demo time-series data.
+
+Feed the generated data through the exact same measurement storage and scoring services used by real ESP32 data.
+
+---
+
+# 45. API Documentation
+
+Create:
+
+```text
+docs/API.md
+```
+
+For every endpoint document:
+
+```text
+Method
+URL
+Purpose
+Request body
+Query parameters
+Success response
+Error response
+```
+
+Include ESP32 integration examples.
+
+---
+
+# 46. README
+
+Root README must explain:
+
+```text
+Project overview
+Architecture
+Prerequisites
+Installation
+Environment variables
+Prisma setup
+Migration
+Seed
+Backend start
+Frontend start
+Mock hardware
+ESP32 LAN integration
+API overview
+```
+
+Example:
+
+```bash
+cd backend
+npm install
+npx prisma migrate dev
+npx prisma db seed
+npm run dev
+```
+
+Frontend:
+
+```bash
+cd frontend
+npm install
+npm run dev
 ```
 
 ---
 
-# 42. ESP32 Integration Contract
+# 47. Testing Requirements
 
-When hardware is ready, the ESP32 will provide:
-
-```text
-cellId
-testId
-elapsedSeconds
-voltage
-current
-temperature
-loadEnabled
-```
-
-The backend must accept these values without requiring frontend changes.
-
-Expected future flow:
+Add tests for:
 
 ```text
-1. Frontend creates cell
-       ↓
-2. Frontend creates test
-       ↓
-3. ESP32 performs physical test
-       ↓
-4. ESP32 sends measurements
-       ↓
-5. Backend stores measurements
-       ↓
-6. ESP32 completes test
-       ↓
-7. Backend calculates analysis
-       ↓
-8. Frontend displays result
-       ↓
-9. Passport is updated
-       ↓
-10. QR opens passport
-```
-
----
-
-# 43. Important Hardware Compatibility Requirements
-
-Current hardware architecture:
-
-```text
-Li-ion Cell
-   │
-   ├── INA219 → ESP32
-   │
-   └── DS18B20 → ESP32
-
-ESP32
-   ├── controls IRLZ44N
-   ├── START button
-   ├── STOP button
-   ├── LEDs
-   ├── buzzer
-   └── UART → Arduino UNO
-
-Arduino UNO
-   └── 2.4" TFT
-```
-
-ESP32 sensor/controller pins currently planned:
-
-```text
-GPIO4  = DS18B20 DATA
-GPIO21 = INA219 SDA
-GPIO22 = INA219 SCL
-GPIO23 = MOSFET gate
-GPIO18 = START
-GPIO19 = STOP
-GPIO25 = BLUE LED
-GPIO26 = GREEN LED
-GPIO27 = RED LED
-GPIO17 = UART TX → UNO A5 RX
-```
-
-Backend must not depend on these pins.
-
-The hardware firmware is responsible for translating hardware readings into the API measurement format.
-
----
-
-# 44. Local Network Requirements for ESP32
-
-The ESP32 cannot call:
-
-```text
-http://localhost:3000
-```
-
-because `localhost` means the ESP32 itself.
-
-If the laptop running the backend has IP:
-
-```text
-192.168.1.10
-```
-
-the ESP32 should call:
-
-```text
-http://192.168.1.10:3000/api/...
-```
-
-Both laptop and ESP32 must be on the same network.
-
-Backend must bind to:
-
-```text
-0.0.0.0
-```
-
-and the firewall must permit TCP port:
-
-```text
-3000
-```
-
-For a phone hotspot, both laptop and ESP32 can join the hotspot and the ESP32 can use the laptop's hotspot/LAN IP.
-
----
-
-# 45. Development Order
-
-The AI coding agent MUST implement in this order:
-
-## Phase 1 — Backend foundation
-
-1. Create Node/Express TypeScript project
-2. Configure PostgreSQL
-3. Configure Prisma
-4. Create schema
-5. Create migrations
-6. Create seed data
-7. Create `/api/health`
-
-## Phase 2 — Cell APIs
-
-Implement:
-
-```text
+GET /api/health
 POST /api/cells
-GET /api/cells
 GET /api/cells/:cellId
-PATCH /api/cells/:cellId
-DELETE /api/cells/:cellId
+POST /api/tests
+POST /api/tests/:testId/measurements
+POST /api/tests/:testId/measurements/batch
+POST /api/tests/:testId/complete
+GET /api/cells/:cellId/passport
+GET /api/cells/:cellId/applications
+GET /api/cells/:cellId/matches
+GET /api/cells/:cellId/lifecycle
 ```
 
-## Phase 3 — Test APIs
-
-Implement all test endpoints.
-
-## Phase 4 — Measurement storage
-
-Implement single and batch measurement endpoints.
-
-## Phase 5 — Analysis
-
-Implement scoring and classification service.
-
-## Phase 6 — Applications
-
-Implement application matching.
-
-## Phase 7 — Lifecycle
-
-Implement lifecycle APIs.
-
-## Phase 8 — Passport
-
-Implement combined passport API.
-
-## Phase 9 — Dashboard APIs
-
-Implement dashboard summary and charts.
-
-## Phase 10 — Mock hardware
-
-Implement simulation endpoints.
-
-## Phase 11 — React frontend
-
-Build pages and API client.
-
-## Phase 12 — Integration testing
-
-Verify:
+Integration test:
 
 ```text
 Create cell
-  ↓
+ -> Create test
+ -> Start
+ -> Add measurements
+ -> Complete
+ -> Score
+ -> Applications
+ -> Lifecycle
+ -> Passport
+ -> QR
+```
+
+---
+
+# 48. Development Order
+
+## Phase 1 — Backend Foundation
+
+- Node.js + Express + TypeScript
+- dotenv
+- SQLite
+- Prisma
+- schema
+- migration
+- seed
+- `/api/health`
+
+## Phase 2 — Cell APIs
+
+Implement all Cell endpoints.
+
+## Phase 3 — Test APIs
+
+Implement creation, start, stop, complete, history.
+
+## Phase 4 — Measurements
+
+Implement single and batch measurement endpoints.
+
+## Phase 5 — Score Engine
+
+Implement scoring and analysis.
+
+## Phase 6 — Application Matching
+
+Implement transparent rule-based recommendations.
+
+## Phase 7 — Cell Matching
+
+Implement multi-cell similarity.
+
+## Phase 8 — Lifecycle
+
+Implement history and automatic events.
+
+## Phase 9 — Passport + QR
+
+Implement combined passport and QR.
+
+## Phase 10 — Dashboard APIs
+
+Implement summary, recent tests and score distribution.
+
+## Phase 11 — Mock Hardware
+
+Implement simulator and profiles.
+
+## Phase 12 — React
+
+Build all pages and API clients.
+
+## Phase 13 — Hardware Integration
+
+Connect the real ESP32 to the already-stable API contract.
+
+---
+
+# 49. Definition of Done
+
+Software is ready when:
+
+- Backend starts
+- React starts
+- SQLite works
+- Prisma migrations work
+- Seed works
+- Health endpoint works
+- Cell CRUD works
+- Test workflow works
+- Measurements work
+- Batch measurements work
+- Score is generated
+- Application matching works
+- Cell matching works
+- Lifecycle works
+- Passport works
+- QR works
+- Dashboard works
+- Charts work
+- Mock hardware works
+- Frontend works without physical hardware
+- Historical data is preserved
+- ESP32 API contract is documented
+- LAN access is documented
+- API docs exist
+- README exists
+- Integration tests pass
+
+---
+
+# 50. Final Demonstration
+
+```text
+Open ReVoltCell Dashboard
+        ↓
+Register/select cell
+        ↓
 Create test
-  ↓
-Add measurements
-  ↓
-Complete test
-  ↓
-Generate analysis
-  ↓
-Application matching
-  ↓
+        ↓
+Mock Hardware OR real ESP32
+        ↓
+Measurements appear
+        ↓
+Test completes
+        ↓
+Second-Life Score
+        ↓
+Screening Category
+        ↓
+Potential Application
+        ↓
+Lifecycle Updated
+        ↓
+Digital Battery Passport
+        ↓
+QR Generated
+        ↓
+Scan QR
+        ↓
+Passport Opens
+        ↓
+Compare Cells
+        ↓
+Matching Candidates
+```
+
+---
+
+# 51. Safety and Technical Boundaries
+
+The software must not instruct users to:
+
+- short cells
+- puncture cells
+- crush cells
+- intentionally overcharge cells
+- dismantle high-voltage EV packs
+
+The proposal specifically states that appropriate low-voltage cells and a protected test holder should be used.
+
+The software must accurately represent measurement limitations:
+
+```text
+Voltage alone != capacity
+```
+
+Capacity requires controlled charge/discharge measurement.
+
+Internal resistance requires an appropriate measurement method.
+
+All scores and application matches are prototype decision-support outputs, not certified engineering decisions.
+
+---
+
+# 52. What Software Does NOT Handle
+
+Do not implement hardware-control logic in the backend for:
+
+```text
+TFT
+INA219 hardware
+DS18B20 hardware
+battery holder
+load circuit
+MOSFET safety
+physical buttons
+LED hardware
+buzzer hardware
+physical thermal shutdown
+```
+
+The ESP32 firmware owns these.
+
+The backend only receives the resulting data and stores/analyzes it.
+
+---
+
+# 53. AI Coding Agent Rules
+
+The coding agent MUST:
+
+1. Use Node.js + Express + TypeScript.
+2. Use React + Vite + TypeScript.
+3. Use SQLite + Prisma.
+4. Implement every required API in this document.
+5. Keep controllers thin.
+6. Keep business logic in services.
+7. Validate requests with Zod.
+8. Use environment variables.
+9. Never hardcode backend URLs in React components.
+10. Keep ESP32 backend URL configurable.
+11. Make software work without hardware.
+12. Implement mock hardware mode.
+13. Use the same analysis pipeline for mock and real data.
+14. Preserve historical measurements.
+15. Preserve lifecycle history.
+16. Never fabricate capacity or internal resistance.
+17. Clearly label prototype scores.
+18. Clearly label potential applications.
+19. Generate passport from database records.
+20. Generate QR from passport URL.
+21. Add seed data.
+22. Add API documentation.
+23. Add README.
+24. Add integration tests.
+25. Do not introduce unrelated frameworks.
+26. Do not replace Node/React with Python/FastAPI.
+27. Do not make ML a required dependency.
+28. Do not implement TFT/sensor control in the backend.
+29. Do not duplicate mock scoring logic.
+30. Keep the public API stable for future ESP32 integration.
+
+---
+
+# 54. Required API Checklist
+
+```text
+SYSTEM
+[ ] GET    /api/health
+
+CELLS
+[ ] POST   /api/cells
+[ ] GET    /api/cells
+[ ] GET    /api/cells/:cellId
+[ ] PATCH  /api/cells/:cellId
+[ ] DELETE /api/cells/:cellId
+
+TESTS
+[ ] POST   /api/tests
+[ ] POST   /api/tests/:testId/start
+[ ] POST   /api/tests/:testId/measurements
+[ ] POST   /api/tests/:testId/measurements/batch
+[ ] POST   /api/tests/:testId/complete
+[ ] POST   /api/tests/:testId/stop
+[ ] GET    /api/tests/:testId
+[ ] GET    /api/cells/:cellId/tests
+
+ANALYSIS
+[ ] POST   /api/analysis/:testId/generate
+[ ] GET    /api/tests/:testId/analysis
+[ ] GET    /api/cells/:cellId/analysis
+
+APPLICATIONS
+[ ] GET    /api/cells/:cellId/applications
+
+MATCHING
+[ ] GET    /api/cells/:cellId/matches
+
+LIFECYCLE
+[ ] GET    /api/cells/:cellId/lifecycle
+[ ] POST   /api/cells/:cellId/lifecycle
+
+PASSPORT
+[ ] GET    /api/cells/:cellId/passport
+[ ] GET    /api/cells/:cellId/qr
+
+DASHBOARD
+[ ] GET    /api/dashboard/summary
+[ ] GET    /api/dashboard/recent-tests
+[ ] GET    /api/dashboard/score-distribution
+
+MOCK HARDWARE
+[ ] POST   /api/mock/tests/:testId/simulate
+
+FUTURE ESP32
+[ ] POST   /api/device/test-data
+```
+
+---
+
+# 55. Final Architecture Principle
+
+The frontend and database must be hardware-independent.
+
+Both mock hardware and real ESP32 data must produce the same measurement object:
+
+```json
+{
+  "cellId": "EV-CELL-001",
+  "testId": "TEST-0001",
+  "elapsedSeconds": 120,
+  "voltage": 3.91,
+  "current": 0.82,
+  "temperature": 31.4,
+  "loadEnabled": true
+}
+```
+
+That object enters the same backend pipeline:
+
+```text
+Measurement
+    ↓
+Database
+    ↓
+Analysis
+    ↓
+Score
+    ↓
+Application Matching
+    ↓
 Lifecycle
-  ↓
+    ↓
 Passport
-  ↓
+    ↓
 QR
 ```
 
----
-
-# 46. Definition of Done
-
-The project is considered backend/frontend ready when:
-
-- Backend starts successfully
-- PostgreSQL connects
-- Prisma migrations work
-- Seed data loads
-- `/api/health` works
-- Cell CRUD works
-- Test creation works
-- Measurement upload works
-- Batch measurement upload works
-- Test completion works
-- Analysis is generated automatically
-- Application recommendations work
-- Cell matching works
-- Lifecycle works
-- Passport endpoint returns combined data
-- Dashboard loads
-- React frontend communicates with backend
-- Mock test mode works
-- Charts display measurement data
-- QR opens passport page
-- No frontend component contains hardcoded backend URLs
-- ESP32 integration contract is documented
-- Backend can later be accessed from ESP32 over LAN
-- Historical measurements are preserved
+This allows the software to be completed before the physical hardware is finished.
 
 ---
 
-# 47. Coding Agent Rules
+# 56. Final Pitch
 
-The AI coding agent MUST follow these rules:
+> **“ReVoltCell doesn't simply test retired EV batteries. It measures remaining value, protects the testing process, gives each cell a traceable digital identity, and helps guide suitable cells toward a potential second-life pathway.”**
 
-1. Do not invent additional hardware components.
-2. Do not create APIs that are unrelated to ReVoltCell.
-3. Keep business logic in services, not React components.
-4. Keep database access inside backend.
-5. Validate all incoming API data.
-6. Use TypeScript types/interfaces consistently.
-7. Use environment variables for configuration.
-8. Never use `localhost` as the ESP32 backend address.
-9. Keep mock hardware mode separate from real hardware integration.
-10. Do not overwrite historical test measurements.
-11. Do not describe prototype score as certified SOH.
-12. Do not claim a cell is safe for a real second-life application.
-13. Use "potential second-life application" and "prototype screening score".
-14. Keep API responses consistent.
-15. Add useful error messages.
-16. Add seed data so the frontend works immediately.
-17. Add README setup instructions.
-18. Add API documentation in the project.
-19. Add basic backend tests for critical endpoints.
-20. Make the backend usable without any physical hardware connected.
+Prototype positioning:
 
----
+> **Hackathon proof-of-concept for EV battery circularity, screening and traceability.**
 
-# 48. Final System
+Production use would require validated instrumentation, battery-specific procedures, engineering controls and applicable standards.
 
-The finished software should provide:
-
-```text
-                 ┌───────────────────────┐
-                 │      React UI         │
-                 │                       │
-                 │ Dashboard             │
-                 │ Cells                 │
-                 │ Testing               │
-                 │ Analysis              │
-                 │ Applications          │
-                 │ Matching              │
-                 │ Lifecycle             │
-                 │ Digital Passport      │
-                 └───────────┬───────────┘
-                             │
-                          REST API
-                             │
-                 ┌───────────▼───────────┐
-                 │    Node/Express       │
-                 │       Backend         │
-                 │                       │
-                 │ Controllers           │
-                 │ Services              │
-                 │ Validation            │
-                 │ Analysis              │
-                 │ Passport              │
-                 └───────────┬───────────┘
-                             │
-                          Prisma
-                             │
-                 ┌───────────▼───────────┐
-                 │      PostgreSQL       │
-                 └───────────────────────┘
-
-
-Later:
-
-                 ┌───────────────────────┐
-                 │       ESP32           │
-                 │ INA219 + DS18B20      │
-                 │ MOSFET + Load         │
-                 └───────────┬───────────┘
-                             │ Wi-Fi
-                             ▼
-                      REST API Backend
-```
-
-The software must be complete enough that the physical hardware can be added later without redesigning the database, API, or React application.
+## END OF SPECIFICATION

@@ -98,8 +98,10 @@ GET /api/cells/:cellId/matches .............. PASS
 GET /api/cells/:cellId/lifecycle ............ PASS
 GET /api/cells/:cellId/passport ............. PASS
 POST /api/mock/tests/:testId/simulate ....... PASS
+GET /api/cells/:cellId/qr ................... PASS
+GET /api/cells/:cellId/qr?format=svg ........ PASS
 
-Results: 17 passed, 0 failed.
+Results: 19 passed, 0 failed.
 ```
 
 ---

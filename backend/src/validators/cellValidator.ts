@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export const createCellSchema = z.object({
   cellId: z.string().min(1, 'cellId is required').trim(),
+  cellType: z.string().optional().default('18650'),
   manufacturer: z.string().optional().default('Unknown'),
   model: z.string().optional().default('18650'),
   chemistry: z.string().optional().default('Li-ion'),
@@ -12,6 +13,7 @@ export const createCellSchema = z.object({
 });
 
 export const updateCellSchema = z.object({
+  cellType: z.string().optional(),
   manufacturer: z.string().optional(),
   model: z.string().optional(),
   chemistry: z.string().optional(),

@@ -19,6 +19,7 @@ export const Cells: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState<CreateCellPayload>({
     cellId: '',
+    cellType: '18650',
     manufacturer: '',
     model: '18650',
     chemistry: 'Li-ion',
@@ -69,6 +70,7 @@ export const Cells: React.FC = () => {
       setIsModalOpen(false);
       setFormData({
         cellId: '',
+        cellType: '18650',
         manufacturer: '',
         model: '18650',
         chemistry: 'Li-ion',
@@ -280,18 +282,32 @@ export const Cells: React.FC = () => {
             )}
 
             <form onSubmit={handleCreateSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: 4 }}>
-                  Cell ID (Unique identifier) *
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. EV-CELL-011"
-                  value={formData.cellId}
-                  onChange={(e) => setFormData({ ...formData, cellId: e.target.value.trim() })}
-                  style={{ width: '100%' }}
-                />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: 4 }}>
+                    Cell ID (Unique) *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. EV-CELL-011"
+                    value={formData.cellId}
+                    onChange={(e) => setFormData({ ...formData, cellId: e.target.value.trim() })}
+                    style={{ width: '100%' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: '#94a3b8', marginBottom: 4 }}>
+                    Cell Type / Format
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 18650, 21700, Prismatic"
+                    value={formData.cellType}
+                    onChange={(e) => setFormData({ ...formData, cellType: e.target.value })}
+                    style={{ width: '100%' }}
+                  />
+                </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>

@@ -5,6 +5,7 @@ import { AnalysisController } from '../controllers/analysisController';
 import { ApplicationController } from '../controllers/applicationController';
 import { LifecycleController } from '../controllers/lifecycleController';
 import { PassportController } from '../controllers/passportController';
+import { QrController } from '../controllers/qrController';
 import { MatchingService } from '../services/matchingService';
 import { validateBody, validateQuery } from '../middleware/validation';
 import { createCellSchema, updateCellSchema, queryCellsSchema } from '../validators/cellValidator';
@@ -26,6 +27,7 @@ router.get('/:cellId/applications', ApplicationController.getCellApplications);
 router.get('/:cellId/lifecycle', LifecycleController.getCellLifecycle);
 router.post('/:cellId/lifecycle', validateBody(createLifecycleEventSchema), LifecycleController.addLifecycleEvent);
 router.get('/:cellId/passport', PassportController.getPassport);
+router.get('/:cellId/qr', QrController.getCellQr);
 
 // Cell matching
 router.get('/:cellId/matches', async (req, res, next) => {

@@ -6,7 +6,7 @@ import { LifecycleService } from '../services/lifecycleService';
 export class CellController {
   public static async createCell(req: Request, res: Response, next: NextFunction) {
     try {
-      const { cellId, manufacturer, model, chemistry, nominalVoltage, ratedCapacityMah, source, manufactureDate } = req.body;
+      const { cellId, cellType, manufacturer, model, chemistry, nominalVoltage, ratedCapacityMah, source, manufactureDate } = req.body;
 
       // Check uniqueness
       const existing = await prisma.cell.findUnique({ where: { cellId } });
@@ -17,6 +17,7 @@ export class CellController {
       const cell = await prisma.cell.create({
         data: {
           cellId,
+          cellType: cellType || '18650',
           manufacturer: manufacturer || 'Unknown',
           model: model || '18650',
           chemistry: chemistry || 'Li-ion',
@@ -35,6 +36,7 @@ export class CellController {
         success: true,
         data: {
           cellId: cell.cellId,
+          cellType: cell.cellType,
           status: cell.status,
           manufacturer: cell.manufacturer,
           model: cell.model,
@@ -93,6 +95,7 @@ export class CellController {
       const formatted = cells.map((cell) => ({
         id: cell.id,
         cellId: cell.cellId,
+        cellType: cell.cellType || '18650',
         manufacturer: cell.manufacturer,
         model: cell.model,
         chemistry: cell.chemistry,

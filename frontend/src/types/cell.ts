@@ -1,6 +1,7 @@
 export interface Cell {
   id: string;
   cellId: string;
+  cellType?: string;
   manufacturer: string;
   model: string;
   chemistry: string;

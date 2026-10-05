@@ -10,6 +10,7 @@ datasource db {
 model Cell {
   id               String                    @id @default(uuid())
   cellId           String                    @unique
+  cellType         String?                   @default("18650")
   manufacturer     String                    @default("Unknown")
   model            String                    @default("18650")
   chemistry        String                    @default("Li-ion")

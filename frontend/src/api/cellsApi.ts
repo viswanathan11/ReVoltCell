@@ -3,6 +3,7 @@ import { Cell, CellListResponse, CellDetailsResponse } from '../types/cell';
 
 export interface CreateCellPayload {
   cellId: string;
+  cellType?: string;
   manufacturer?: string;
   model?: string;
   chemistry?: string;
@@ -103,5 +104,17 @@ export const cellsApi = {
       method: 'POST',
       body: JSON.stringify({ event, description }),
     });
+  },
+
+  getQrCode: async (cellId: string) => {
+    return apiClient<{
+      success: boolean;
+      data: {
+        cellId: string;
+        passportUrl: string;
+        qrSvg: string;
+        qrDataUrl: string;
+      };
+    }>(`/cells/${cellId}/qr`);
   },
 };

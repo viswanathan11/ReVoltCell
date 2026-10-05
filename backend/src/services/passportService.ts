@@ -48,6 +48,7 @@ export class PassportService {
       cell: {
         id: cell.id,
         cellId: cell.cellId,
+        cellType: cell.cellType || '18650',
         manufacturer: cell.manufacturer,
         model: cell.model,
         chemistry: cell.chemistry,
@@ -117,6 +118,7 @@ export class PassportService {
         stopReason: t.stopReason,
       })),
       passportUrl,
+      qrApiUrl: `${ENV.API_BASE_URL}/api/cells/${cell.cellId}/qr`,
       createdDate: cell.createdAt,
       updatedDate: cell.updatedAt,
       disclaimer:

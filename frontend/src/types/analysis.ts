@@ -46,6 +46,7 @@ export interface BatteryPassportData {
   cell: {
     id: string;
     cellId: string;
+    cellType?: string;
     manufacturer: string;
     model: string;
     chemistry: string;
@@ -67,6 +68,7 @@ export interface BatteryPassportData {
   lifecycle: LifecycleEvent[];
   testHistory: any[];
   passportUrl: string;
+  qrApiUrl?: string;
   createdDate: string;
   updatedDate: string;
   disclaimer: string;

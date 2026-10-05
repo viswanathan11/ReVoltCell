@@ -11,7 +11,7 @@ export class ApplicationService {
     voltageSag: number,
     temperatureRise: number
   ): ApplicationMatch[] {
-    if (classification === 'UNSUITABLE' || score < 45) {
+    if (classification === 'UNSUITABLE' || score < 60) {
       return [
         {
           application: 'LOW_POWER_STORAGE',
@@ -24,17 +24,17 @@ export class ApplicationService {
           reason: 'Unstable under continuous discharge cycles.',
         },
         {
-          application: 'BACKUP_POWER',
+          application: 'SMALL_BACKUP_SYSTEM',
           suitability: 'NOT_RECOMMENDED',
           reason: 'High risk of premature voltage collapse during backup events.',
         },
         {
-          application: 'LED_LIGHTING',
+          application: 'BACKUP_LIGHTING',
           suitability: 'NOT_RECOMMENDED',
           reason: 'Recommended for materials recovery and recycling.',
         },
         {
-          application: 'LOW_POWER_ELECTRONICS',
+          application: 'LOW_POWER_IOT',
           suitability: 'NOT_RECOMMENDED',
           reason: 'Safety and stability criteria not satisfied.',
         },
@@ -54,79 +54,49 @@ export class ApplicationService {
           reason: 'Good cell health and low internal impedance suitable for buffered solar storage.',
         },
         {
-          application: 'LED_LIGHTING',
+          application: 'BACKUP_LIGHTING',
           suitability: 'HIGH',
           reason: 'Consistent voltage output for regulated DC lighting arrays.',
         },
         {
-          application: 'BACKUP_POWER',
+          application: 'SMALL_BACKUP_SYSTEM',
           suitability: 'MEDIUM',
           reason: 'Reliable capacity buffer for non-critical standby power units.',
         },
         {
-          application: 'LOW_POWER_ELECTRONICS',
+          application: 'LOW_POWER_IOT',
           suitability: 'HIGH',
           reason: 'Safe for microcontrollers, sensors, and remote telemetry modules.',
         },
       ];
     }
 
-    if (classification === 'FURTHER_EVALUATION' || score >= 65) {
-      return [
-        {
-          application: 'LED_LIGHTING',
-          suitability: 'HIGH',
-          reason: 'Adequate discharge profile for constant-current LED drivers.',
-        },
-        {
-          application: 'LOW_POWER_ELECTRONICS',
-          suitability: 'HIGH',
-          reason: 'Well-suited for low-drain hobbyist and stationary electronic devices.',
-        },
-        {
-          application: 'LOW_POWER_STORAGE',
-          suitability: 'MEDIUM',
-          reason: 'Acceptable for lower-capacity auxiliary storage if monitored with active BMS.',
-        },
-        {
-          application: 'SOLAR_STORAGE',
-          suitability: 'LOW',
-          reason: 'Elevated sag suggests reduced efficiency during daily deep cycling.',
-        },
-        {
-          application: 'BACKUP_POWER',
-          suitability: 'LOW',
-          reason: 'Voltage drops quickly under higher pulse loads.',
-        },
-      ];
-    }
-
-    // LOW_PERFORMANCE (45 <= score < 65)
+    // 60 <= score < 80 (Needs Additional Testing / Further Evaluation)
     return [
       {
-        application: 'LOW_POWER_ELECTRONICS',
-        suitability: 'MEDIUM',
-        reason: 'Marginal performance; acceptable for small intermittent low-current loads only.',
+        application: 'BACKUP_LIGHTING',
+        suitability: 'HIGH',
+        reason: 'Adequate discharge profile for constant-current LED drivers.',
       },
       {
-        application: 'LED_LIGHTING',
-        suitability: 'LOW',
-        reason: 'Accelerated voltage drop will cause noticeable brightness dimming.',
+        application: 'LOW_POWER_IOT',
+        suitability: 'HIGH',
+        reason: 'Well-suited for low-drain hobbyist and stationary electronic devices.',
       },
       {
         application: 'LOW_POWER_STORAGE',
-        suitability: 'NOT_RECOMMENDED',
-        reason: 'High internal resistance makes bank integration inefficient.',
+        suitability: 'MEDIUM',
+        reason: 'Acceptable for lower-capacity auxiliary storage if monitored with active BMS.',
+      },
+      {
+        application: 'SMALL_BACKUP_SYSTEM',
+        suitability: 'LOW',
+        reason: 'Voltage drops quickly under higher pulse loads.',
       },
       {
         application: 'SOLAR_STORAGE',
-        suitability: 'NOT_RECOMMENDED',
-        reason: 'Unsuitable for cyclic duty with potential thermal accumulation.',
-      },
-      {
-        application: 'BACKUP_POWER',
-        suitability: 'NOT_RECOMMENDED',
-        reason: 'Voltage drops too rapidly under emergency load demands.',
+        suitability: 'LOW',
+        reason: 'Elevated sag suggests reduced efficiency during daily deep cycling.',
       },
     ];
   }

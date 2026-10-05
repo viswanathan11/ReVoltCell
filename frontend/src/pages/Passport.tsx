@@ -124,6 +124,10 @@ export const Passport: React.FC = () => {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, fontSize: '0.85rem' }}>
                 <div>
+                  <span style={{ color: '#64748b' }}>Form Factor: </span>
+                  <strong style={{ color: '#38bdf8' }}>{cell.cellType || '18650'}</strong>
+                </div>
+                <div>
                   <span style={{ color: '#64748b' }}>Manufacturer: </span>
                   <strong style={{ color: '#f1f5f9' }}>{cell.manufacturer}</strong>
                 </div>
@@ -219,9 +223,19 @@ export const Passport: React.FC = () => {
 
             <div style={{ backgroundColor: '#1e293b', padding: 16, borderRadius: 8, fontSize: '0.775rem' }}>
               <div style={{ fontWeight: 700, color: '#cbd5e1', marginBottom: 6 }}>QR Verification Link:</div>
-              <p style={{ color: '#94a3b8', lineHeight: 1.4 }}>
+              <p style={{ color: '#94a3b8', lineHeight: 1.4, marginBottom: 12 }}>
                 Scannable by field technicians using mobile devices to inspect battery health before disassembly or repacking.
               </p>
+              <a
+                href={passport.qrApiUrl ? `${passport.qrApiUrl}?format=svg` : `/api/cells/${cell.cellId}/qr?format=svg`}
+                target="_blank"
+                rel="noreferrer"
+                className="btn btn-secondary btn-sm"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: '0.75rem', width: '100%', justifyContent: 'center' }}
+              >
+                <ExternalLink size={12} />
+                <span>Server Vector SVG QR</span>
+              </a>
             </div>
           </div>
         </div>

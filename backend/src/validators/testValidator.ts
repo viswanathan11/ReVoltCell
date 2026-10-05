@@ -40,12 +40,17 @@ export const simulateTestSchema = z.object({
 
 export const createLifecycleEventSchema = z.object({
   event: z.enum([
+    'ORIGINAL_EV',
     'EV_BATTERY',
     'RETIRED',
     'RECOVERED',
+    'REVOLTCELL_TESTED',
     'TESTED',
+    'SCORED',
     'SECOND_LIFE_EVALUATION',
+    'SECOND_LIFE_APPLICATION',
     'SECOND_LIFE_CANDIDATE',
+    'RETEST',
     'RECYCLE',
   ]),
   description: z.string().min(1, 'description is required'),

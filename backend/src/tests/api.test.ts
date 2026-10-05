@@ -163,7 +163,15 @@ async function runTests() {
     });
     assert(simRes.status === 200 && simRes.body.data.measurementsCount > 20, 'POST /api/mock/tests/:testId/simulate generates curve');
 
-    // 18. Clean up test cell
+    // 18. Server QR endpoint tests
+    const qrRes = await request(`/api/cells/${testCellId}/qr`);
+    assert(qrRes.status === 200 && qrRes.body.data.qrSvg && qrRes.body.data.qrDataUrl, 'GET /api/cells/:cellId/qr returns SVG and DataURL');
+
+    const qrSvgRes = await fetch(`${baseUrl}/api/cells/${testCellId}/qr?format=svg`);
+    const svgText = await qrSvgRes.text();
+    assert(qrSvgRes.status === 200 && svgText.includes('<svg'), 'GET /api/cells/:cellId/qr?format=svg returns raw SVG');
+
+    // 19. Clean up test cell
     await prisma.testMeasurement.deleteMany({ where: { test: { cellId: testCellId } } });
     await prisma.analysis.deleteMany({ where: { cellId: testCellId } });
     await prisma.applicationRecommendation.deleteMany({ where: { cellId: testCellId } });
