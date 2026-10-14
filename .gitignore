@@ -12,9 +12,16 @@ build/
 out/
 */out/
 
-# Environment Variables
+# Environment Variables and Secrets
+.env
+.env.*
+*.env
+**/.env
+**/.env.*
 !.env.example
-!*/.env.example
+!**/.env.example
+!.env.sample
+!**/.env.sample
 
 # SQLite Databases & Storage
 *.db
