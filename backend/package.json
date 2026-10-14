@@ -10,6 +10,7 @@
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
     "prisma:seed": "tsx prisma/seed.ts",
+    "prisma:clear": "tsx prisma/clear.ts",
     "test": "tsx src/tests/api.test.ts"
   },
   "dependencies": {

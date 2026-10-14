@@ -59,8 +59,13 @@ export interface CanonicalReportContext {
     durationSeconds: number | null;
     stopReason: string | null;
     loadResistanceOhms: number | null;
-    loadPowerRatingWatts: number | null;
     measurements: CanonicalMeasurementField[];
+    timeseriesSample?: Array<{
+      elapsedSeconds: number;
+      voltage: number;
+      temperature?: number | null;
+      current?: number | null;
+    }>;
   };
   screeningOutcome: {
     prototypeScore: number | null;

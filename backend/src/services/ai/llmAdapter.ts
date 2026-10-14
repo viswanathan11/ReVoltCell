@@ -48,7 +48,7 @@ export class GeminiAdapter implements ILlmAdapter {
     for (const currentModel of candidateModels) {
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${this.apiKey}`;
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+      const timer = setTimeout(() => controller.abort(), Math.min(this.timeoutMs, 8000));
 
       try {
         const res = await fetch(url, {

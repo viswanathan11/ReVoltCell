@@ -6,6 +6,7 @@
     "dev:backend": "npm --prefix backend run dev",
     "dev:frontend": "npm --prefix frontend run dev",
     "seed": "npm --prefix backend run prisma:seed",
+    "clear:db": "npm --prefix backend run prisma:clear",
     "test:backend": "npm --prefix backend test",
     "build:backend": "npm --prefix backend run build",
     "build:frontend": "npm --prefix frontend run build"

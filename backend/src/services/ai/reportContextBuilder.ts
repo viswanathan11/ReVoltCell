@@ -88,6 +88,23 @@ export class ReportContextBuilder {
       },
     ];
 
+    // Sample evenly spaced checkpoints from the ESP32 measurements curve if available
+    let timeseriesSample: any[] | undefined = undefined;
+    if (Array.isArray(test.measurements) && test.measurements.length > 0) {
+      const total = test.measurements.length;
+      const sampleIndices = [0, Math.floor(total * 0.25), Math.floor(total * 0.5), Math.floor(total * 0.75), total - 1];
+      const uniqueIndices = Array.from(new Set(sampleIndices)).filter((i) => i >= 0 && i < total);
+      timeseriesSample = uniqueIndices.map((idx) => {
+        const m = test.measurements[idx];
+        return {
+          elapsedSeconds: m.elapsedSeconds,
+          voltage: m.voltage,
+          temperature: m.temperature,
+          current: m.current,
+        };
+      });
+    }
+
     return {
       reportId: test.testId,
       cellId: cell.cellId,
@@ -108,6 +125,7 @@ export class ReportContextBuilder {
         loadResistanceOhms: test.loadResistanceOhms ?? 5.0,
         loadPowerRatingWatts: test.loadPowerRatingWatts ?? 10.0,
         measurements,
+        timeseriesSample,
       },
       screeningOutcome: {
         prototypeScore: analysis?.score ?? null,
@@ -127,7 +145,7 @@ export class ReportContextBuilder {
       lifecycleHistoryCount: cell.lifecycleEvents ? cell.lifecycleEvents.length : undefined,
       publicPassportUrl: `${ENV.PASSPORT_BASE_URL}/${cell.cellId}`,
       disclaimer:
-        'ReVoltCell VoltIQ provides rapid preliminary screening explanations for research and second-life repurposing triage. This does not replace certified testing or qualified BMS state-of-health diagnostics.',
+        'ReVoltCell VoltIQ provides rapid preliminary screening explanations for research and second-life repurposing triage. This is decision support only and does not replace certified testing or qualified BMS state-of-health diagnostics.',
     };
   }
 
@@ -162,6 +180,16 @@ export class ReportContextBuilder {
       lines.push(
         `- [${m.status}] ${m.label}: ${m.value !== null ? `${m.value} ${m.unit || ''}` : 'NOT AVAILABLE'} (${m.note || ''})`
       );
+    }
+
+    if (context.dischargeTest.timeseriesSample && context.dischargeTest.timeseriesSample.length > 0) {
+      lines.push('');
+      lines.push('ESP32 DISCHARGE CURVE SENSOR TELEMETRY (Sampled Checkpoints across test):');
+      for (const pt of context.dischargeTest.timeseriesSample) {
+        lines.push(
+          `- t=${pt.elapsedSeconds}s: Terminal Voltage = ${pt.voltage} V, Temperature = ${pt.temperature !== null && pt.temperature !== undefined ? `${pt.temperature} °C` : 'N/A'}, Load Current = ${pt.current !== null && pt.current !== undefined ? `${pt.current} A` : 'N/A'}`
+        );
+      }
     }
     lines.push('');
     lines.push('--- SCREENING EVALUATION OUTCOME ---');

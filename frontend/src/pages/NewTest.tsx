@@ -15,8 +15,8 @@ export const NewTest: React.FC = () => {
   const [loadResistance, setLoadResistance] = useState(5.0);
   const [powerRating, setPowerRating] = useState(10.0);
 
-  // Hardware vs Mock mode toggle
-  const [isMockMode, setIsMockMode] = useState(true);
+  // Hardware vs Mock mode toggle (defaults to false for physical hardware testing)
+  const [isMockMode, setIsMockMode] = useState(false);
   const [mockProfile, setMockProfile] = useState<'GOOD' | 'WEAK' | 'HOT' | 'UNSTABLE'>('GOOD');
 
   const [submitting, setSubmitting] = useState(false);
