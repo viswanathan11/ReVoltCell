@@ -19,10 +19,14 @@ out/
 # SQLite Databases & Storage
 *.db
 *.db-journal
+*.db-wal
+*.db-shm
 *.sqlite
 *.sqlite3
 backend/dev.db
 backend/dev.db-journal
+backend/dev.db-wal
+backend/dev.db-shm
 
 # Logs
 logs/

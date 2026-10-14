@@ -4,6 +4,7 @@ import { AppError } from '../middleware/errorHandler';
 import { AnalysisService } from '../services/analysisService';
 import { ApplicationService } from '../services/applicationService';
 import { LifecycleService } from '../services/lifecycleService';
+import { realtimeService } from '../services/realtimeService';
 
 export class TestController {
   public static async createTest(req: Request, res: Response, next: NextFunction) {
@@ -68,6 +69,16 @@ export class TestController {
         data: { status: 'TESTING' },
       });
 
+      realtimeService.emitTestEvent(testId, {
+        type: 'START',
+        data: {
+          testId: updated.testId,
+          status: updated.status,
+          startedAt: updated.startedAt,
+        },
+      });
+      realtimeService.emitDashboardUpdate();
+
       res.json({
         success: true,
         data: {
@@ -103,6 +114,12 @@ export class TestController {
         },
       });
 
+      // Realtime instantaneous SSE push to connected browsers
+      realtimeService.emitTestEvent(testId, {
+        type: 'MEASUREMENT',
+        data: measurement,
+      });
+
       res.status(201).json({
         success: true,
         data: measurement,
@@ -133,6 +150,12 @@ export class TestController {
       }));
 
       await prisma.testMeasurement.createMany({
+        data: dataToInsert,
+      });
+
+      // Realtime push of batch points
+      realtimeService.emitTestEvent(testId, {
+        type: 'BATCH_MEASUREMENTS',
         data: dataToInsert,
       });
 
@@ -303,6 +326,21 @@ export class TestController {
         );
       }
 
+      // Realtime push of completion & calculated scores
+      realtimeService.emitTestEvent(testId, {
+        type: 'COMPLETE',
+        data: {
+          testId: updatedTest.testId,
+          cellId: updatedTest.cellId,
+          status: updatedTest.status,
+          score: analysis.score,
+          classification: analysis.classification,
+          analysis,
+          applications: appMatches,
+        },
+      });
+      realtimeService.emitDashboardUpdate();
+
       res.json({
         success: true,
         data: {
@@ -344,6 +382,16 @@ export class TestController {
         data: { status: 'REGISTERED' },
       });
 
+      realtimeService.emitTestEvent(testId, {
+        type: 'STOP',
+        data: {
+          testId: updated.testId,
+          status: updated.status,
+          stopReason: updated.stopReason,
+        },
+      });
+      realtimeService.emitDashboardUpdate();
+
       res.json({
         success: true,
         data: {
@@ -355,6 +403,39 @@ export class TestController {
     } catch (err) {
       next(err);
     }
+  }
+
+  /**
+   * Realtime SSE (Server-Sent Events) live streaming endpoint.
+   * Browsers receive sensor measurements and status updates instantly in 0ms without polling delay.
+   */
+  public static streamTest(req: Request, res: Response) {
+    const testId = req.params.testId as string;
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    if (typeof (res as any).flushHeaders === 'function') {
+      (res as any).flushHeaders();
+    }
+
+    res.write(`data: ${JSON.stringify({ type: 'CONNECTED', testId, timestamp: new Date().toISOString() })}\n\n`);
+
+    const listener = (event: any) => {
+      res.write(`data: ${JSON.stringify(event)}\n\n`);
+    };
+
+    realtimeService.onTestEvent(testId, listener);
+
+    const heartbeat = setInterval(() => {
+      res.write(': heartbeat\n\n');
+    }, 15000);
+
+    req.on('close', () => {
+      clearInterval(heartbeat);
+      realtimeService.offTestEvent(testId, listener);
+    });
   }
 
   public static async getTestById(req: Request, res: Response, next: NextFunction) {

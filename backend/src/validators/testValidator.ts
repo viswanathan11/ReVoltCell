@@ -66,3 +66,12 @@ export const deviceTestDataSchema = z.object({
   temperature: z.number(),
   loadEnabled: z.boolean().optional().default(true),
 });
+
+export const deviceTestCompleteSchema = z.object({
+  deviceId: z.string().optional().default('REVOLTCELL-ESP32-001'),
+  testId: z.string().min(1, 'testId is required'),
+  cellId: z.string().min(1, 'cellId is required'),
+  stopReason: z.enum(['COMPLETED', 'USER_STOP', 'LOW_VOLTAGE', 'OVER_TEMPERATURE', 'TIMEOUT', 'ERROR']).optional().default('COMPLETED'),
+  testDurationSeconds: z.number().nonnegative().optional(),
+});
+

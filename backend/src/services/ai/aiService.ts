@@ -56,6 +56,43 @@ export class AiService {
     });
 
     if (!cell) {
+      if (identifier === 'OVERVIEW' || identifier === 'SYSTEM' || identifier.toLowerCase().includes('overview')) {
+        const cellCount = await prisma.cell.count();
+        const testCount = await prisma.test.count();
+        return {
+          test: {
+            testId: 'SYSTEM-OVERVIEW',
+            cellId: 'OPERATIONS',
+            status: 'READY',
+            loadResistanceOhms: 5.0,
+            loadPowerRatingWatts: 10.0,
+            initialVoltage: 3.7,
+            finalVoltage: null,
+            minimumVoltage: null,
+            averageCurrent: null,
+            maximumCurrent: null,
+            initialTemperature: 25.0,
+            maximumTemperature: null,
+            temperatureRise: null,
+            testDurationSeconds: 0,
+            stopReason: `Inventory Status: ${cellCount} cells, ${testCount} tests recorded. Bench ready for hardware testing.`,
+            measurements: [],
+            analysis: null,
+            applications: [],
+          },
+          cell: {
+            cellId: 'OPERATIONS',
+            manufacturer: 'ReVoltCell Platform',
+            model: 'Hardware Screening Jig',
+            chemistry: 'Li-ion (18650/21700)',
+            cellType: '18650',
+            nominalVoltage: 3.7,
+            ratedCapacityMah: 2500,
+            source: 'Laboratory Ingestion Bench',
+            lifecycleEvents: [],
+          } as any,
+        };
+      }
       return null;
     }
 
