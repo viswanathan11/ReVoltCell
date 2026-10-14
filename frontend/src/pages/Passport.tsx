@@ -9,18 +9,22 @@ import {
   Battery,
   Clock,
   ExternalLink,
+  Sparkles,
 } from 'lucide-react';
 import { passportApi } from '../api/passportApi';
 import { BatteryPassportData } from '../types/analysis';
 import { CellStatusBadge } from '../components/CellStatusBadge';
 import { QRCodeCard } from '../components/QRCodeCard';
 import { LifecycleTimeline } from '../components/LifecycleTimeline';
+import { ReportChat } from '../components/ReportChat';
+import { VoltIQAvatar } from '../components/VoltIQAvatar';
 
 export const Passport: React.FC = () => {
   const { cellId } = useParams<{ cellId: string }>();
   const [passport, setPassport] = useState<BatteryPassportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   useEffect(() => {
     if (!cellId) return;
@@ -275,6 +279,74 @@ export const Passport: React.FC = () => {
 
           <LifecycleTimeline events={lifecycle} />
         </div>
+
+        {/* VoltIQ QR Passport Partner Callout Card */}
+        <div
+          className="no-print"
+          style={{
+            backgroundColor: '#0f172a',
+            border: '1px solid #10b981',
+            borderRadius: 8,
+            padding: '16px 20px',
+            marginBottom: 20,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 16,
+            flexWrap: 'wrap',
+            boxShadow: '0 4px 20px rgba(16, 185, 129, 0.1)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <VoltIQAvatar size={42} mode="passport" glow animate />
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#f8fafc', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span>VoltIQ AI Passport Guide</span>
+                <span
+                  style={{
+                    fontSize: '0.65rem',
+                    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                    color: '#34d399',
+                    padding: '2px 8px',
+                    borderRadius: 12,
+                    fontWeight: 700,
+                  }}
+                >
+                  LIVE PARTNER
+                </span>
+              </div>
+              <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: 3 }}>
+                Need second-life guidance? Click the floating circular AI robot button anytime or tap here to chat.
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className="btn btn-primary"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              fontSize: '0.825rem',
+              backgroundColor: '#10b981',
+              borderColor: '#10b981',
+            }}
+            onClick={() => setIsChatOpen(true)}
+          >
+            <Sparkles size={14} />
+            <span>Ask VoltIQ Guide</span>
+          </button>
+        </div>
+
+        {/* VoltIQ Floating AI Partner Widget */}
+        <ReportChat
+          testId={latestTest?.testId || cell.cellId}
+          cellId={cell.cellId}
+          mode="passport"
+          isOpen={isChatOpen}
+          onOpenChange={setIsChatOpen}
+        />
 
         {/* Official Disclaimer */}
         <div style={{ fontSize: '0.75rem', color: '#64748b', borderTop: '1px solid #1e293b', paddingTop: 14, textAlign: 'center' }}>

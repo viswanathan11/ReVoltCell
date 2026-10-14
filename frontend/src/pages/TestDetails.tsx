@@ -18,6 +18,8 @@ import { TestSession } from '../types/test';
 import { CellStatusBadge } from '../components/CellStatusBadge';
 import { ScoreGauge } from '../components/ScoreGauge';
 import { TestChart } from '../components/TestChart';
+import { ReportChat } from '../components/ReportChat';
+import { VoltIQAvatar } from '../components/VoltIQAvatar';
 
 export const TestDetails: React.FC = () => {
   const { testId } = useParams<{ testId: string }>();
@@ -25,6 +27,7 @@ export const TestDetails: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   const fetchTest = async () => {
     if (!testId) return;
@@ -288,6 +291,65 @@ export const TestDetails: React.FC = () => {
           />
         </div>
       )}
+
+      {/* VoltIQ AI Partner Callout Bar */}
+      <div
+        className="card"
+        style={{
+          marginTop: 8,
+          marginBottom: 24,
+          border: '1px solid rgba(56, 189, 248, 0.3)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: 16,
+          padding: '16px 20px',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <VoltIQAvatar size={42} mode="dashboard" glow animate />
+          <div>
+            <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#f8fafc', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span>VoltIQ AI Diagnostic Partner</span>
+              <span
+                style={{
+                  fontSize: '0.65rem',
+                  backgroundColor: 'rgba(56, 189, 248, 0.2)',
+                  color: '#38bdf8',
+                  padding: '2px 8px',
+                  borderRadius: 12,
+                  fontWeight: 700,
+                }}
+              >
+                READY
+              </span>
+            </div>
+            <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: 2 }}>
+              Have questions about this discharge curve, transient sag, or thermal rise? Ask VoltIQ anytime.
+            </div>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          className="btn btn-primary"
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: '0.825rem' }}
+          onClick={() => setIsChatOpen(true)}
+        >
+          <Sparkles size={14} />
+          <span>Chat with VoltIQ</span>
+        </button>
+      </div>
+
+      {/* Floating VoltIQ AI Partner Widget */}
+      <ReportChat
+        testId={test.testId}
+        cellId={test.cellId}
+        mode="dashboard"
+        isOpen={isChatOpen}
+        onOpenChange={setIsChatOpen}
+      />
     </div>
   );
 };

@@ -14,6 +14,7 @@ import dashboardRoutes from './routes/dashboardRoutes';
 import passportRoutes from './routes/passportRoutes';
 import mockRoutes from './routes/mockRoutes';
 import deviceRoutes from './routes/deviceRoutes';
+import aiRoutes from './routes/aiRoutes';
 
 export function createApp(): Application {
   const app = express();
@@ -58,6 +59,7 @@ export function createApp(): Application {
   app.use('/api/passport', passportRoutes);
   app.use('/api/mock', mockRoutes);
   app.use('/api/device', deviceRoutes);
+  app.use('/api/ai', aiRoutes);
 
   // 404 handler for undefined API routes
   app.use('/api/*', (req: Request, res: Response) => {

@@ -8,10 +8,13 @@ import {
   PlayCircle,
   Plus,
   RefreshCw,
+  Sparkles,
 } from 'lucide-react';
 import { dashboardApi, DashboardSummary, RecentTestItem, ScoreDistributionItem } from '../api/dashboardApi';
 import { StatCard } from '../components/StatCard';
 import { CellStatusBadge } from '../components/CellStatusBadge';
+import { ReportChat } from '../components/ReportChat';
+import { VoltIQAvatar } from '../components/VoltIQAvatar';
 import {
   ResponsiveContainer,
   BarChart,
@@ -27,6 +30,8 @@ export const Dashboard: React.FC = () => {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [recentTests, setRecentTests] = useState<RecentTestItem[]>([]);
   const [distribution, setDistribution] = useState<ScoreDistributionItem[]>([]);
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
+  const [isChatOpen, setIsChatOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,6 +48,9 @@ export const Dashboard: React.FC = () => {
       setSummary(sumRes.data);
       setRecentTests(recRes.data);
       setDistribution(distRes.data.distribution);
+      if (recRes.data.length > 0) {
+        setSelectedReportId((prev) => prev || recRes.data[0].testId);
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to load dashboard metrics');
     } finally {
@@ -270,10 +278,29 @@ export const Dashboard: React.FC = () => {
                     {new Date(t.createdAt).toLocaleDateString()}
                   </td>
                   <td>
-                    <div style={{ display: 'flex', gap: 6 }}>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                       <Link to={`/test/${t.testId}`} className="btn btn-secondary btn-sm">
                         View Curve
                       </Link>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          color: selectedReportId === t.testId ? '#38bdf8' : undefined,
+                          borderColor: selectedReportId === t.testId ? '#38bdf8' : undefined,
+                        }}
+                        onClick={() => {
+                          setSelectedReportId(t.testId);
+                          setIsChatOpen(true);
+                        }}
+                        title="Chat with VoltIQ about this report"
+                      >
+                        <Sparkles size={12} color={selectedReportId === t.testId ? '#38bdf8' : '#94a3b8'} />
+                        <span>VoltIQ</span>
+                      </button>
                       <Link to={`/passport/${t.cellId}`} className="btn btn-secondary btn-sm">
                         Passport
                       </Link>
@@ -292,6 +319,80 @@ export const Dashboard: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {/* Dashboard VoltIQ AI Assistant Bar */}
+      <div className="card" style={{ marginTop: 24, marginBottom: 24, border: '1px solid rgba(56, 189, 248, 0.3)' }}>
+        <div className="card-header" style={{ flexWrap: 'wrap', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <VoltIQAvatar size={42} mode="dashboard" glow animate />
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="card-title">VoltIQ AI Battery Intelligence Partner</span>
+                <span
+                  style={{
+                    fontSize: '0.65rem',
+                    backgroundColor: 'rgba(56, 189, 248, 0.2)',
+                    color: '#38bdf8',
+                    padding: '2px 8px',
+                    borderRadius: 12,
+                    fontWeight: 700,
+                  }}
+                >
+                  ACTIVE
+                </span>
+              </div>
+              <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: 2 }}>
+                Report-aware AI assistant explaining discharge curves, screening scores, and potential second-life applications.
+              </div>
+            </div>
+          </div>
+
+          {/* Test Report Selector & Launch Button */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.8rem', color: '#94a3b8' }}>Target Report:</span>
+            <select
+              value={selectedReportId || ''}
+              onChange={(e) => setSelectedReportId(e.target.value)}
+              style={{
+                backgroundColor: '#1e293b',
+                color: '#f8fafc',
+                border: '1px solid #334155',
+                borderRadius: 6,
+                padding: '6px 10px',
+                fontSize: '0.825rem',
+                outline: 'none',
+              }}
+            >
+              {recentTests.map((t) => (
+                <option key={t.testId} value={t.testId}>
+                  {t.testId} — {t.cellId} ({t.classification || 'UNTESTED'}, Score: {t.score ?? '—'})
+                </option>
+              ))}
+            </select>
+
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              onClick={() => setIsChatOpen(true)}
+              disabled={!selectedReportId}
+            >
+              <Sparkles size={14} />
+              <span>Open Chat</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Floating VoltIQ AI Partner Widget */}
+      {selectedReportId && (
+        <ReportChat
+          testId={selectedReportId}
+          mode="dashboard"
+          isOpen={isChatOpen}
+          onOpenChange={setIsChatOpen}
+        />
+      )}
 
       {/* Prototype Screening Notice */}
       <div className="disclaimer-box">
