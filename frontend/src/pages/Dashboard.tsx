@@ -392,24 +392,21 @@ export const Dashboard: React.FC = () => {
               className="btn btn-primary btn-sm"
               style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
               onClick={() => setIsChatOpen(true)}
-              disabled={!selectedReportId}
             >
               <Sparkles size={14} />
-              <span>Open Chat</span>
+              <span>Ask VoltIQ</span>
             </button>
           </div>
         </div>
       </div>
 
-      {/* Floating VoltIQ AI Partner Widget */}
-      {selectedReportId && (
-        <ReportChat
-          testId={selectedReportId}
-          mode="dashboard"
-          isOpen={isChatOpen}
-          onOpenChange={setIsChatOpen}
-        />
-      )}
+      {/* Floating VoltIQ AI Partner Widget — ALWAYS present on screen */}
+      <ReportChat
+        testId={selectedReportId || 'OVERVIEW'}
+        mode="dashboard"
+        isOpen={isChatOpen}
+        onOpenChange={setIsChatOpen}
+      />
 
       {/* Prototype Screening Notice */}
       <div className="disclaimer-box">
