@@ -11,12 +11,21 @@ build/
 */build/
 out/
 */out/
+coverage/
+.nyc_output/
 
-# Environment Variables
+# Environment Variables and Secrets
+.env
+.env.*
+*.env
+**/.env
+**/.env.*
 !.env.example
-!*/.env.example
+!**/.env.example
+!.env.sample
+!**/.env.sample
 
-# SQLite Databases & Storage
+# SQLite Databases and Storage
 *.db
 *.db-journal
 *.db-wal
@@ -37,7 +46,13 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# Editor & OS Artifacts
+# Runtime and Process Files
+*.pid
+*.pid.lock
+pids/
+*.seed
+
+# Editor and OS Artifacts
 .DS_Store
 Thumbs.db
 .idea/
@@ -47,8 +62,63 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
+*.code-workspace
 
-# Temporary / Scratch Files
+# Temporary and Scratch Files
 tmp/
 temp/
 scratch/
+.cache/
+.parcel-cache/
+.turbo/
+
+# TypeScript
+*.tsbuildinfo
+
+# Testing
+playwright-report/
+test-results/
+.nyc_output/
+
+# Python (if used for scripts or tools)
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# ESP32 / PlatformIO
+.pio/
+.platformio/
+firmware/.pio/
+firmware/.pioenvs/
+firmware/.piolibdeps/
+
+# Arduino and embedded build artifacts
+*.elf
+*.hex
+*.bin
+*.map
+
+# Local database and application uploads
+uploads/
+storage/
+
+# Package manager debug files
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# OS swap and backup files
+*.bak
+*.tmp
+*.swp
+*.swo
+*~
+
+# Local development configuration
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
