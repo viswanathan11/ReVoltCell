@@ -29,6 +29,8 @@ export const TestDetails: React.FC = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
 
+  const [isLiveStreaming, setIsLiveStreaming] = useState(false);
+
   const fetchTest = async () => {
     if (!testId) return;
     try {
@@ -45,10 +47,78 @@ export const TestDetails: React.FC = () => {
     fetchTest();
   }, [testId]);
 
-  // Polling when test is RUNNING
+  // Real-time zero-delay SSE streaming connection
   useEffect(() => {
-    if (!test || test.status !== 'RUNNING') return;
-    const interval = setInterval(fetchTest, 2000);
+    if (!testId) return;
+
+    const streamUrl = `${import.meta.env.VITE_API_BASE_URL || '/api'}/tests/${testId}/stream`;
+    let eventSource: EventSource | null = null;
+
+    try {
+      eventSource = new EventSource(streamUrl);
+
+      eventSource.onopen = () => {
+        setIsLiveStreaming(true);
+      };
+
+      eventSource.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          if (payload.type === 'MEASUREMENT' && payload.data) {
+            setTest((prev) => {
+              if (!prev) return prev;
+              const exists = (prev.measurements || []).some(
+                (m) => m.elapsedSeconds === payload.data.elapsedSeconds
+              );
+              if (exists) return prev;
+              return {
+                ...prev,
+                status: 'RUNNING',
+                measurements: [...(prev.measurements || []), payload.data],
+              };
+            });
+          } else if (payload.type === 'BATCH_MEASUREMENTS' && Array.isArray(payload.data)) {
+            setTest((prev) => {
+              if (!prev) return prev;
+              const existingTimes = new Set((prev.measurements || []).map((m) => m.elapsedSeconds));
+              const newPoints = payload.data.filter((m: any) => !existingTimes.has(m.elapsedSeconds));
+              return {
+                ...prev,
+                status: 'RUNNING',
+                measurements: [...(prev.measurements || []), ...newPoints],
+              };
+            });
+          } else if (payload.type === 'START') {
+            setTest((prev) => (prev ? { ...prev, status: 'RUNNING', startedAt: payload.data?.startedAt } : prev));
+          } else if (payload.type === 'COMPLETE') {
+            fetchTest();
+          } else if (payload.type === 'STOP') {
+            setTest((prev) => (prev ? { ...prev, status: 'STOPPED', stopReason: payload.data?.stopReason } : prev));
+          }
+        } catch {
+          // Ignore heartbeat / malformed data
+        }
+      };
+
+      eventSource.onerror = () => {
+        setIsLiveStreaming(false);
+      };
+    } catch {
+      setIsLiveStreaming(false);
+    }
+
+    return () => {
+      if (eventSource) {
+        eventSource.close();
+      }
+    };
+  }, [testId]);
+
+  // Sub-second polling fallback (dual redundancy for zero-lag guarantee)
+  useEffect(() => {
+    if (!test || test.status === 'COMPLETED' || test.status === 'STOPPED') return;
+    const intervalTime = test.status === 'RUNNING' ? 600 : 1200;
+    const interval = setInterval(fetchTest, intervalTime);
     return () => clearInterval(interval);
   }, [test?.status, testId]);
 
@@ -142,6 +212,18 @@ export const TestDetails: React.FC = () => {
             Test Session {test.testId}
           </h1>
           <CellStatusBadge status={test.status} />
+          {test.status === 'RUNNING' && (
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 10px', backgroundColor: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(16, 185, 129, 0.35)', borderRadius: 20, fontSize: '0.75rem', color: '#10b981', fontWeight: 600 }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: '#10b981', display: 'inline-block', boxShadow: '0 0 8px #10b981' }} />
+              <span>LIVE TELEMETRY STREAMING ({measurements.length} pts)</span>
+            </div>
+          )}
+          {test.status === 'PENDING' && (
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 10px', backgroundColor: 'rgba(245, 158, 11, 0.12)', border: '1px solid rgba(245, 158, 11, 0.35)', borderRadius: 20, fontSize: '0.75rem', color: '#f59e0b', fontWeight: 500 }}>
+              <Clock size={12} />
+              <span>Listening for ESP32 start signal...</span>
+            </div>
+          )}
         </div>
 
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>

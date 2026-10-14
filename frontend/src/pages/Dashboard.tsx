@@ -35,9 +35,11 @@ export const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchData = async () => {
-    setLoading(true);
-    setError(null);
+  const fetchData = async (silent = false) => {
+    if (!silent) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       const [sumRes, recRes, distRes] = await Promise.all([
         dashboardApi.getSummary(),
@@ -52,14 +54,23 @@ export const Dashboard: React.FC = () => {
         setSelectedReportId((prev) => prev || recRes.data[0].testId);
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to load dashboard metrics');
+      if (!silent) {
+        setError(err.message || 'Failed to load dashboard metrics');
+      }
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   };
 
   useEffect(() => {
     fetchData();
+    // Silent auto-refresh every 2.5 seconds so hardware test completions show up instantly
+    const interval = setInterval(() => {
+      fetchData(true);
+    }, 2500);
+    return () => clearInterval(interval);
   }, []);
 
   const getBarColor = (classification: string) => {
@@ -82,14 +93,20 @@ export const Dashboard: React.FC = () => {
       {/* Title & Quick Actions */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h1 style={{ fontSize: '1.65rem', fontWeight: 700, color: '#f8fafc' }}>Screening Operations Dashboard</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <h1 style={{ fontSize: '1.65rem', fontWeight: 700, color: '#f8fafc' }}>Screening Operations Dashboard</h1>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 8px', backgroundColor: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: 12, fontSize: '0.72rem', color: '#10b981', fontWeight: 600 }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#10b981', display: 'inline-block', boxShadow: '0 0 6px #10b981' }} />
+              Live Sync
+            </span>
+          </div>
           <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginTop: 4 }}>
             Rapid triage and second-life qualification for recovered Li-ion cells.
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button className="btn btn-secondary btn-sm" onClick={fetchData} title="Refresh Dashboard">
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <button className="btn btn-secondary btn-sm" onClick={() => fetchData(false)} title="Refresh Dashboard">
             <RefreshCw size={15} />
             <span>Refresh</span>
           </button>

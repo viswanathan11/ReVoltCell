@@ -19,6 +19,7 @@ router.post('/:testId/measurements/batch', validateBody(batchMeasurementSchema),
 router.post('/:testId/complete', validateBody(completeTestSchema), TestController.completeTest);
 router.post('/:testId/stop', validateBody(stopTestSchema), TestController.stopTest);
 router.get('/:testId', TestController.getTestById);
+router.get('/:testId/stream', TestController.streamTest);
 router.get('/:testId/analysis', AnalysisController.getTestAnalysis);
 
 export default router;
