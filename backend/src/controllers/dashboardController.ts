@@ -1,7 +1,39 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from '../config/prisma';
+import { realtimeService } from '../services/realtimeService';
 
 export class DashboardController {
+  /**
+   * Realtime SSE live streaming endpoint for the dashboard.
+   * Browsers receive instant notifications when screenings occur with 0ms delay.
+   */
+  public static streamDashboard(req: Request, res: Response) {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    if (typeof (res as any).flushHeaders === 'function') {
+      (res as any).flushHeaders();
+    }
+
+    res.write(`data: ${JSON.stringify({ type: 'CONNECTED', timestamp: new Date().toISOString() })}\n\n`);
+
+    const listener = (data: any) => {
+      res.write(`data: ${JSON.stringify({ type: 'UPDATE', data, timestamp: new Date().toISOString() })}\n\n`);
+    };
+
+    realtimeService.onDashboardUpdate(listener);
+
+    const heartbeat = setInterval(() => {
+      res.write(': heartbeat\n\n');
+    }, 15000);
+
+    req.on('close', () => {
+      clearInterval(heartbeat);
+      realtimeService.offDashboardUpdate(listener);
+    });
+  }
+
   public static async getSummary(req: Request, res: Response, next: NextFunction) {
     try {
       const totalCells = await prisma.cell.count();

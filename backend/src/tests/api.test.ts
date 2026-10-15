@@ -293,7 +293,79 @@ async function runTests() {
       'POST /api/ai/tests/:testId/chat enthusiastically explains the ReVoltCell vision'
     );
 
-    // 20. Clean up test cell
+    // 20. ESP32 Screening Integration Tests
+    // 20a. Rejects disconnected temperature sensor (-127°C)
+    const espBadTemp = await request('/api/device/screening', {
+      method: 'POST',
+      body: JSON.stringify({
+        voltage: 3.85,
+        temperature: -127.0,
+        current_mA: 600,
+        suitable: false,
+        testDurationSeconds: 4,
+        deviceId: 'REVOLTCELL-ESP32-001',
+      }),
+    });
+    assert(
+      espBadTemp.status === 422 &&
+        espBadTemp.body.success === false &&
+        espBadTemp.body.error.message.includes('Temperature sensor disconnected'),
+      'POST /api/device/screening rejects disconnected temperature sensor (-127°C) with 422'
+    );
+
+    // 20b. Valid ESP32 screening request creates cell, test, analysis, recommendations
+    const espScreening = await request('/api/device/screening', {
+      method: 'POST',
+      body: JSON.stringify({
+        voltage: 3.85,
+        temperature: 26.4,
+        current_mA: 624,
+        suitable: true,
+        testDurationSeconds: 4,
+        deviceId: 'REVOLTCELL-ESP32-001',
+      }),
+    });
+    assert(
+      espScreening.status === 201 &&
+        espScreening.body.success === true &&
+        espScreening.body.data.cellId.startsWith('CELL-') &&
+        espScreening.body.data.testId.startsWith('TEST-') &&
+        espScreening.body.data.status === 'COMPLETED' &&
+        espScreening.body.data.score > 0 &&
+        espScreening.body.data.passportUrl.includes(espScreening.body.data.cellId),
+      'POST /api/device/screening creates battery, test, analysis, and returns 201'
+    );
+
+    const espCellId = espScreening.body.data?.cellId;
+
+    // 20c. Newly screened cell is visible on Dashboard recent tests
+    const recentRes = await request('/api/dashboard/recent-tests?limit=5');
+    assert(
+      recentRes.status === 200 &&
+        recentRes.body.data.some((t: any) => t.cellId === espCellId),
+      'GET /api/dashboard/recent-tests reflects the newly screened ESP32 cell'
+    );
+
+    // 20d. Newly screened cell passport is immediately available
+    const passportRes = await request(`/api/cells/${espCellId}/passport`);
+    assert(
+      passportRes.status === 200 &&
+        passportRes.body.data.batteryId === espCellId &&
+        passportRes.body.data.latestAnalysis !== null &&
+        passportRes.body.data.lifecycle.length >= 3,
+      'GET /api/cells/:cellId/passport renders complete digital passport for ESP32 cell'
+    );
+
+    // 21. Clean up test cells
+    if (espCellId) {
+      await prisma.testMeasurement.deleteMany({ where: { test: { cellId: espCellId } } });
+      await prisma.analysis.deleteMany({ where: { cellId: espCellId } });
+      await prisma.applicationRecommendation.deleteMany({ where: { cellId: espCellId } });
+      await prisma.lifecycleEvent.deleteMany({ where: { cellId: espCellId } });
+      await prisma.test.deleteMany({ where: { cellId: espCellId } });
+      await prisma.cell.deleteMany({ where: { cellId: espCellId } });
+    }
+
     await prisma.testMeasurement.deleteMany({ where: { test: { cellId: testCellId } } });
     await prisma.analysis.deleteMany({ where: { cellId: testCellId } });
     await prisma.applicationRecommendation.deleteMany({ where: { cellId: testCellId } });

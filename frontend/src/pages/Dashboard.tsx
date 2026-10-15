@@ -9,7 +9,11 @@ import {
   Plus,
   RefreshCw,
   Sparkles,
+  QrCode,
+  X,
+  ExternalLink,
 } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { dashboardApi, DashboardSummary, RecentTestItem, ScoreDistributionItem } from '../api/dashboardApi';
 import { StatCard } from '../components/StatCard';
 import { CellStatusBadge } from '../components/CellStatusBadge';
@@ -32,8 +36,11 @@ export const Dashboard: React.FC = () => {
   const [distribution, setDistribution] = useState<ScoreDistributionItem[]>([]);
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [qrModalCellId, setQrModalCellId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [isSseConnected, setIsSseConnected] = useState(false);
 
   const fetchData = async (silent = false) => {
     if (!silent) {
@@ -64,9 +71,47 @@ export const Dashboard: React.FC = () => {
     }
   };
 
+  // Real-time zero-delay SSE streaming connection for the dashboard
+  useEffect(() => {
+    const streamUrl = `${import.meta.env.VITE_API_BASE_URL || '/api'}/dashboard/stream`;
+    let eventSource: EventSource | null = null;
+
+    try {
+      eventSource = new EventSource(streamUrl);
+
+      eventSource.onopen = () => {
+        setIsSseConnected(true);
+      };
+
+      eventSource.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          if (payload.type === 'UPDATE') {
+            // Instant real-time update with 0ms delay when ESP32 screening arrives
+            fetchData(true);
+          }
+        } catch {
+          // Heartbeat
+        }
+      };
+
+      eventSource.onerror = () => {
+        setIsSseConnected(false);
+      };
+    } catch {
+      setIsSseConnected(false);
+    }
+
+    return () => {
+      if (eventSource) {
+        eventSource.close();
+      }
+    };
+  }, []);
+
   useEffect(() => {
     fetchData();
-    // Silent auto-refresh every 2.5 seconds so hardware test completions show up instantly
+    // Silent auto-refresh polling backup (every 2.5 seconds)
     const interval = setInterval(() => {
       fetchData(true);
     }, 2500);
@@ -95,9 +140,31 @@ export const Dashboard: React.FC = () => {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <h1 style={{ fontSize: '1.65rem', fontWeight: 700, color: '#f8fafc' }}>Screening Operations Dashboard</h1>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 8px', backgroundColor: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: 12, fontSize: '0.72rem', color: '#10b981', fontWeight: 600 }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#10b981', display: 'inline-block', boxShadow: '0 0 6px #10b981' }} />
-              Live Sync
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                padding: '3px 8px',
+                backgroundColor: isSseConnected ? 'rgba(16, 185, 129, 0.12)' : 'rgba(245, 158, 11, 0.12)',
+                border: `1px solid ${isSseConnected ? 'rgba(16, 185, 129, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`,
+                borderRadius: 12,
+                fontSize: '0.72rem',
+                color: isSseConnected ? '#10b981' : '#f59e0b',
+                fontWeight: 600,
+              }}
+            >
+              <span
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: '50%',
+                  backgroundColor: isSseConnected ? '#10b981' : '#f59e0b',
+                  display: 'inline-block',
+                  boxShadow: `0 0 6px ${isSseConnected ? '#10b981' : '#f59e0b'}`,
+                }}
+              />
+              {isSseConnected ? 'Real-Time SSE Live' : 'Polling Sync'}
             </span>
           </div>
           <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginTop: 4 }}>
@@ -321,6 +388,20 @@ export const Dashboard: React.FC = () => {
                       <Link to={`/passport/${t.cellId}`} className="btn btn-secondary btn-sm">
                         Passport
                       </Link>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                        }}
+                        onClick={() => setQrModalCellId(t.cellId)}
+                        title="Display Digital Passport QR Code"
+                      >
+                        <QrCode size={12} color="#38bdf8" />
+                        <span>QR</span>
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -412,6 +493,89 @@ export const Dashboard: React.FC = () => {
       <div className="disclaimer-box">
         <strong>Notice on Prototype Screening:</strong> ReVoltCell is a rapid pre-screening triage platform designed to identify high-potential candidates for secondary utilization. Calculated prototype scores and classifications do not constitute certified State-of-Health (SOH) certifications or pack safety compliance ratings.
       </div>
+
+      {/* Quick QR Code Modal */}
+      {qrModalCellId && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.75)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: 20,
+          }}
+          onClick={() => setQrModalCellId(null)}
+        >
+          <div
+            className="card"
+            style={{
+              maxWidth: 380,
+              width: '100%',
+              textAlign: 'center',
+              position: 'relative',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5)',
+              border: '1px solid #334155',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setQrModalCellId(null)}
+              style={{
+                position: 'absolute',
+                top: 14,
+                right: 14,
+                background: 'transparent',
+                border: 'none',
+                color: '#94a3b8',
+                cursor: 'pointer',
+              }}
+            >
+              <X size={18} />
+            </button>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#f8fafc', marginBottom: 6 }}>
+              Battery Passport QR Code
+            </h3>
+            <p style={{ fontSize: '0.8rem', color: '#94a3b8', marginBottom: 16 }}>
+              Scan to view digital certificate & second-life recommendations.
+            </p>
+
+            <div style={{ padding: 16, backgroundColor: '#ffffff', borderRadius: 8, display: 'inline-block', marginBottom: 14 }}>
+              <QRCodeSVG
+                value={`${window.location.origin}/passport/${qrModalCellId}`}
+                size={180}
+                level="M"
+              />
+            </div>
+
+            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#cbd5e1', marginBottom: 16 }}>
+              ID: {qrModalCellId}
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+              <Link
+                to={`/passport/${qrModalCellId}`}
+                className="btn btn-primary btn-sm"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                onClick={() => setQrModalCellId(null)}
+              >
+                <ExternalLink size={14} />
+                <span>Open Passport Page</span>
+              </Link>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => setQrModalCellId(null)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -75,3 +75,34 @@ export const deviceTestCompleteSchema = z.object({
   testDurationSeconds: z.number().nonnegative().optional(),
 });
 
+export const deviceScreeningSchema = z.object({
+  voltage: z
+    .number({ required_error: 'voltage is required' })
+    .positive('voltage must be positive')
+    .max(10, 'voltage exceeds single-cell limit (10V)'),
+  temperature: z
+    .number({ required_error: 'temperature is required' })
+    .refine((val) => val !== -127 && val !== -127.0, {
+      message: 'Temperature sensor disconnected or invalid reading (-127°C)',
+    })
+    .refine((val) => val >= -30 && val <= 120, {
+      message: 'temperature out of valid operating range (-30°C to 120°C)',
+    }),
+  current_mA: z
+    .number({ required_error: 'current_mA is required' })
+    .nonnegative('current_mA cannot be negative')
+    .max(50000, 'current_mA exceeds maximum plausible test threshold (50A)'),
+  suitable: z.boolean().optional(),
+  testDurationSeconds: z
+    .number()
+    .int('testDurationSeconds must be an integer')
+    .positive('testDurationSeconds must be >= 1')
+    .optional()
+    .default(4),
+  deviceId: z
+    .string()
+    .min(1)
+    .optional()
+    .default('REVOLTCELL-ESP32-001'),
+});
+
